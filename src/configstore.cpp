@@ -30,8 +30,12 @@
 //   "url"      → abre um site ou arquivo  (campo "url")
 //   "toggle"   → liga/desliga algo        (campo "toggle": "wifi", "bluetooth",
 //                                          "dnd" ou "nightlight")
+//   "media"    → controla o player que está tocando (campo "action":
+//                                          "playpause", "next" ou "previous")
 //   "windows"  → submenu com as janelas abertas, montado na hora (sem campos extras)
 //   "menu"     → submenu                  (campo "items": outra lista de itens)
+// Qualquer item que executa algo aceita "keepOpen": true/false (o menu continua
+// aberto depois de executar). Sem o campo, só os itens de mídia ficam abertos.
 // =============================================================================
 
 #include "configstore.h"

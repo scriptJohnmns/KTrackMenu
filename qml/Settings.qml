@@ -771,11 +771,11 @@ Kirigami.ApplicationWindow {
                         }
                         QQC2.Label {
                             Kirigami.FormData.label: "Escolher:"
-                            text: "Mova o cursor na direção do item e clique, ou use as teclas 1–9"
+                            text: "Mova o cursor na direção do item e clique (ou solte o atalho), ou use as teclas 1–9"
                         }
                         QQC2.Label {
                             Kirigami.FormData.label: "Voltar/fechar:"
-                            text: "Botão direito abre um submenu; clique no centro ou Backspace volta; Esc fecha"
+                            text: "Botão direito abre um submenu; clique no centro ou Backspace volta; clique fora ou Esc fecha"
                         }
 
                         Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Sistema" }

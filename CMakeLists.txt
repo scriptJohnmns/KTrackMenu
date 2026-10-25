@@ -93,4 +93,7 @@ target_link_libraries(trackpmenu PRIVATE
 # O que o "cmake --install" copia: o executável para bin/ e o arquivo .desktop
 # para share/applications/ (é ele que faz o app aparecer no menu do KDE).
 install(TARGETS trackpmenu ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES data/io.github.trackpmenu.desktop DESTINATION ${KDE_INSTALL_APPDIR})
+# O .desktop é gerado com o caminho completo do executável no Exec=, para o
+# atalho do menu de apps funcionar mesmo se ~/.local/bin não estiver no PATH.
+configure_file(data/io.github.trackpmenu.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/io.github.trackpmenu.desktop @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/io.github.trackpmenu.desktop DESTINATION ${KDE_INSTALL_APPDIR})
