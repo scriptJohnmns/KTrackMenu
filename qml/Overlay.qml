@@ -31,7 +31,7 @@ Window {
 
     visible: false        // quem mostra a janela é o MenuController::show()
     color: "transparent"
-    title: "TrackpMenu"
+    title: "KTrackMenu"
 
     // ---- Tamanhos e visual (vêm da aba Aparência das configurações) ----
     readonly property var appearance: Config.config.appearance
@@ -148,6 +148,12 @@ Window {
         selected = -1
         placed = false
         shownAt = Date.now()
+        // Easter eggs começam do zero a cada abertura.
+        easterText = ""
+        spinAngle = 0
+        lastAngle = NaN
+        spinSamples = []
+        keyHistory = []
         Toggles.refresh()   // relê se Wi-Fi, Bluetooth etc. estão ligados
         fallbackTimer.restart()
         keys.forceActiveFocus()
@@ -276,6 +282,59 @@ Window {
         function onShowRequested() { root.reset() }
     }
 
+    // ---- Easter eggs ----
+    // Mensagem engraçada no centro do anel ("" = nenhuma). Some sozinha.
+    property string easterText: ""
+    Timer {
+        id: easterTimer
+        interval: 2500
+        onTriggered: root.easterText = ""
+    }
+    function showEaster(text) {
+        easterText = text
+        easterTimer.restart()
+    }
+
+    // "Tá tonto?": dar 3 voltas com o cursor em volta do centro, em até 2,5 s,
+    // faz o anel girar. spinAngle soma quanto o cursor girou desde que o menu
+    // abriu (sem voltar a zero a cada volta); spinSamples guarda os últimos
+    // valores com o horário, para medir quanto girou nos últimos 2,5 s.
+    property real spinAngle: 0
+    property real lastAngle: NaN    // NaN = ainda não há ângulo anterior
+    property var spinSamples: []
+    function trackSpin(x, y) {
+        const dx = x - center.x
+        const dy = y - center.y
+        // Muito perto do centro, a direção muda demais com qualquer tremida: ignora.
+        if (Math.hypot(dx, dy) < innerRadius)
+            return
+        const a = Math.atan2(dy, dx)
+        if (!isNaN(lastAngle)) {
+            // Diferença para o ângulo anterior, entre -π e π (o caminho mais curto).
+            let d = a - lastAngle
+            if (d > Math.PI) d -= 2 * Math.PI
+            if (d < -Math.PI) d += 2 * Math.PI
+            spinAngle += d
+        }
+        lastAngle = a
+        const now = Date.now()
+        const samples = spinSamples.filter(sample => now - sample.t < 2500)
+        samples.push({ t: now, a: spinAngle })
+        spinSamples = samples
+        // 3 voltas = 6π, em qualquer sentido (por isso o Math.abs).
+        if (Math.abs(spinAngle - samples[0].a) >= 6 * Math.PI) {
+            spinSamples = []
+            spinAnimation.restart()
+            showEaster("Tá tonto? 😵")
+        }
+    }
+
+    // Código Konami (↑ ↑ ↓ ↓ ← → ← → B A): os itens "caem" e voltam quicando.
+    readonly property var konamiCode: [Qt.Key_Up, Qt.Key_Up, Qt.Key_Down, Qt.Key_Down, Qt.Key_Left,
+                                       Qt.Key_Right, Qt.Key_Left, Qt.Key_Right, Qt.Key_B, Qt.Key_A]
+    property var keyHistory: []     // últimas teclas apertadas (no máximo 10)
+    signal konami()                 // avisa cada item para fazer a animação de queda
+
     // Índice do item que acabou de ser executado sem fechar o menu (-1 = nenhum).
     // Fica marcado só por um instante, para o item encolher e voltar.
     property int pressedIndex: -1
@@ -316,6 +375,7 @@ Window {
             }
             root.lastPos = Qt.point(mouse.x, mouse.y)
             root.selected = root.indexForPointer(mouse.x, mouse.y)
+            root.trackSpin(mouse.x, mouse.y)
         }
         // Clique fora do disco: fecha o menu.
         // Clique sem nada selecionado (cursor no centro): volta/fecha.
@@ -359,6 +419,14 @@ Window {
                 root.trigger(root.selected)
         }
         Keys.onPressed: event => {
+            // Guarda as últimas 10 teclas e confere se formam o código Konami.
+            // As setas continuam funcionando normalmente enquanto isso.
+            root.keyHistory = root.keyHistory.concat([event.key]).slice(-10)
+            if (root.keyHistory.join() === root.konamiCode.join()) {
+                root.keyHistory = []
+                root.konami()
+                root.showEaster("🕹️ Código secreto!")
+            }
             if (event.key === Qt.Key_Escape) {
                 Controller.hide()
             } else if (event.key === Qt.Key_Backspace) {
@@ -393,6 +461,20 @@ Window {
         scale: root.placed ? 1 : 0.8
         Behavior on opacity { NumberAnimation { duration: root.animDuration } }
         Behavior on scale { NumberAnimation { duration: root.animDuration; easing.type: Easing.OutBack } }
+
+        // Easter egg "Tá tonto?": uma volta completa com efeito de mola no fim.
+        // O anel tem tamanho zero e fica no centro, então ele gira em volta do centro.
+        NumberAnimation {
+            id: spinAnimation
+            target: ring
+            property: "rotation"
+            from: 0
+            to: 360
+            duration: 1400
+            easing.type: Easing.OutElastic
+            easing.amplitude: 1
+            easing.period: 0.6
+        }
 
         // Usa as cores do tema do KDE para "áreas de conteúdo" (claro/escuro conforme o tema).
         Kirigami.Theme.colorSet: Kirigami.Theme.View
@@ -489,13 +571,15 @@ Window {
                 font.weight: root.selected >= 0 ? Font.DemiBold : Font.Normal
                 // Encadeamento de "condição ? valor : senão":
                 // item selecionado → nome dele; dentro de submenu → nome do submenu;
-                // senão → nome do app (se houver anel interno) ou "TrackpMenu"
+                // senão → nome do app (se houver anel interno) ou "KTrackMenu"
                 // (ou "Menu vazio" se não houver itens).
                 // Com controles de mídia no anel, sem seleção → nome da música.
-                text: root.selectedItem ? root.selectedItem.label
+                // Uma mensagem de easter egg passa na frente de tudo.
+                text: root.easterText ? root.easterText
+                    : root.selectedItem ? root.selectedItem.label
                     : root.showsMedia ? (Media.available ? (Media.title || Media.playerName) : "Nada tocando")
                     : root.stack.length ? root.titles[root.titles.length - 1]
-                    : root.totalCount ? (root.innerCount ? root.rootTitle : "TrackpMenu") : "Menu vazio"
+                    : root.totalCount ? (root.innerCount ? root.rootTitle : "KTrackMenu") : "Menu vazio"
             }
             // Embaixo do nome da música, o artista.
             Text {
@@ -547,6 +631,7 @@ Window {
     // "component" define um tipo novo dentro deste arquivo: o círculo de um item.
     // Os dois anéis usam o mesmo componente, cada um com seus tamanhos.
     component RingItem: Rectangle {
+        id: ringItem
         // "required property" recebe os dados de cada item:
         // modelData = o objeto do item, index = a posição dele na lista.
         required property var modelData
@@ -580,6 +665,29 @@ Window {
         scale: pressed ? 0.9 : current ? 1.12 : 1
         Behavior on scale { NumberAnimation { duration: overlay.animDuration } }
         Behavior on color { ColorAnimation { duration: overlay.animDuration } }
+
+        // Easter egg do código Konami: o item cai até o fundo da tela, quica no
+        // "chão" (OutBounce), espera um pouco e volta para o lugar. Cada item
+        // sai um pouquinho depois do anterior, em cascata.
+        transform: Translate { id: drop }
+        SequentialAnimation {
+            id: fall
+            PauseAnimation { duration: (firstIndex + index) * 70 }
+            NumberAnimation {
+                target: drop
+                property: "y"
+                // Distância até o fundo da tela: altura da janela menos onde o item está.
+                to: ringItem.overlay.height - (ringItem.overlay.center.y + ringItem.y + ringItem.height) - 8
+                duration: 900
+                easing.type: Easing.OutBounce
+            }
+            PauseAnimation { duration: 500 }
+            NumberAnimation { target: drop; property: "y"; to: 0; duration: 600; easing.type: Easing.OutBack }
+        }
+        Connections {
+            target: overlay
+            function onKonami() { fall.restart() }
+        }
 
         // Ícone do item (nome de ícone do tema do KDE, ex.: "firefox").
         Kirigami.Icon {

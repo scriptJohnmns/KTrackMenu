@@ -17,13 +17,13 @@
 //   report()        → a cada troca da janela em foco
 //   reportWindows() → quando janelas abrem, fecham, mudam de título ou de ordem
 //
-// As janelas do próprio TrackpMenu (o menu e as configurações) são ignoradas:
+// As janelas do próprio KTrackMenu (o menu e as configurações) são ignoradas:
 // assim, quando o menu abre, ainda lembramos do app que estava na frente.
 class WindowTracker : public QObject
 {
     Q_OBJECT
     // Nome da interface D-Bus deste objeto (o script do KWin usa esse nome).
-    Q_CLASSINFO("D-Bus Interface", "io.github.trackpmenu.Windows")
+    Q_CLASSINFO("D-Bus Interface", "io.github.ktrackmenu.Windows")
 
 public:
     explicit WindowTracker(QObject *parent = nullptr);

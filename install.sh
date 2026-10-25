@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
-# install.sh — instala (ou remove) o TrackpMenu em qualquer distro com KDE Plasma 6
+# install.sh — instala (ou remove) o KTrackMenu em qualquer distro com KDE Plasma 6
 #
 # O que ele faz:
 #   1. descobre o gerenciador de pacotes (dnf, pacman, zypper ou apt) e instala
 #      o que é preciso para compilar;
 #   2. compila o programa na pasta build/;
 #   3. instala em ~/.local (ou em /usr/local, com --system);
-#   4. se o TrackpMenu já estava rodando, reinicia para usar a versão nova.
+#   4. se o KTrackMenu já estava rodando, reinicia para usar a versão nova.
 #
 # Uso:
 #   ./install.sh               instala para o seu usuário (~/.local)
@@ -62,24 +62,44 @@ done
 # Rodar o script inteiro como root bagunçaria as permissões de ~/.local e da build/.
 [[ $EUID -eq 0 ]] && die "Não rode como root. O script pede a senha (sudo) só quando precisa."
 
-# Encerra o TrackpMenu se ele estiver rodando. Devolve 0 se estava rodando.
+# Encerra o KTrackMenu se ele estiver rodando. Devolve 0 se estava rodando.
 stop_running() {
-    if pgrep -x trackpmenu >/dev/null; then
+    if pgrep -x ktrackmenu >/dev/null; then
         # Primeiro pede com educação; se não sair em 2 s, força.
-        "$PREFIX/bin/trackpmenu" --quit >/dev/null 2>&1 || pkill -x trackpmenu || true
-        for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x trackpmenu >/dev/null || return 0; sleep 0.2; done
-        pkill -x trackpmenu || true
+        "$PREFIX/bin/ktrackmenu" --quit >/dev/null 2>&1 || pkill -x ktrackmenu || true
+        for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x ktrackmenu >/dev/null || return 0; sleep 0.2; done
+        pkill -x ktrackmenu || true
         return 0
     fi
     return 1
+}
+
+# O app se chamava TrackpMenu. Fecha e remove a versão antiga (executável e
+# atalho no menu de apps). Devolve 0 se ela estava rodando. A configuração e o
+# atalho de teclado são migrados pelo próprio KTrackMenu na primeira vez que abre.
+remove_legacy() {
+    local was=1
+    if pgrep -x trackpmenu >/dev/null; then
+        was=0
+        pkill -x trackpmenu || true
+        for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x trackpmenu >/dev/null || break; sleep 0.2; done
+    fi
+    for p in "$HOME/.local" "/usr/local"; do
+        for f in "$p/bin/trackpmenu" "$p/share/applications/io.github.trackpmenu.desktop"; do
+            [[ -e $f ]] || continue
+            if [[ $p == /usr/local ]]; then sudo rm -fv "$f"; else rm -fv "$f"; fi
+        done
+    done
+    return $was
 }
 
 # =============================================================================
 # Desinstalar
 # =============================================================================
 if [[ $ACTION == "uninstall" ]]; then
-    step "Removendo o TrackpMenu"
+    step "Removendo o KTrackMenu"
     stop_running || true
+    remove_legacy || true
     # O CMake anota em install_manifest.txt cada arquivo que instalou.
     if [[ -f "$BUILD_DIR/install_manifest.txt" ]]; then
         while IFS= read -r file; do
@@ -89,14 +109,14 @@ if [[ $ACTION == "uninstall" ]]; then
         # Sem o manifesto (ex.: a pasta build/ foi apagada), remove os caminhos conhecidos.
         for p in "$HOME/.local" "/usr/local"; do
             [[ $p == /usr/local ]] && s="sudo" || s=""
-            [[ -e "$p/bin/trackpmenu" ]] && $s rm -fv "$p/bin/trackpmenu"
-            [[ -e "$p/share/applications/io.github.trackpmenu.desktop" ]] && $s rm -fv "$p/share/applications/io.github.trackpmenu.desktop"
+            [[ -e "$p/bin/ktrackmenu" ]] && $s rm -fv "$p/bin/ktrackmenu"
+            [[ -e "$p/share/applications/io.github.ktrackmenu.desktop" ]] && $s rm -fv "$p/share/applications/io.github.ktrackmenu.desktop"
         done
     fi
     # Arquivos que o próprio programa cria: script do KWin e "Iniciar com a sessão".
-    rm -rfv "$HOME/.local/share/trackpmenu"
-    rm -fv "$HOME/.config/autostart/io.github.trackpmenu.desktop"
-    ok "Removido. O seu menu continua em ~/.config/trackpmenu/ (apague a pasta se quiser)."
+    rm -rfv "$HOME/.local/share/ktrackmenu"
+    rm -fv "$HOME/.config/autostart/io.github.ktrackmenu.desktop"
+    ok "Removido. O seu menu continua em ~/.config/ktrackmenu/ (apague a pasta se quiser)."
     exit 0
 fi
 
@@ -108,10 +128,10 @@ fi
 if command -v plasmashell >/dev/null; then
     plasma_version="$(plasmashell --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -n1 || true)"
     if [[ ${plasma_version%%.*} != "6" ]]; then
-        warn "Plasma $plasma_version encontrado. O TrackpMenu precisa do Plasma 6."
+        warn "Plasma $plasma_version encontrado. O KTrackMenu precisa do Plasma 6."
     fi
 else
-    warn "plasmashell não encontrado. O TrackpMenu foi feito para o KDE Plasma 6 e não funciona em outros ambientes."
+    warn "plasmashell não encontrado. O KTrackMenu foi feito para o KDE Plasma 6 e não funciona em outros ambientes."
 fi
 
 # ---- Dependências ----
@@ -147,7 +167,7 @@ install_deps() {
             libkf6kio-dev libkf6windowsystem-dev \
             qml6-module-org-kde-kirigami qml6-module-org-kde-iconthemes qml6-module-org-kde-kquickcontrols \
             qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-dialogs \
-            qml6-module-qtquick-window qml6-module-qtqml-workerscript
+            qml6-module-qtquick-window qml6-module-qtquick-effects qml6-module-qtqml-workerscript
     else
         warn "Gerenciador de pacotes não reconhecido. Instale as dependências do README e rode com --no-deps."
         return 1
@@ -162,6 +182,10 @@ command -v cmake >/dev/null || die "cmake não encontrado. Instale as dependênc
 
 # ---- Compilar ----
 step "Compilando (pasta build/)"
+# Uma build/ feita quando o projeto ainda se chamava TrackpMenu é descartada.
+if grep -q "CMAKE_PROJECT_NAME:STATIC=trackpmenu" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
+    rm -rf "$BUILD_DIR"
+fi
 # Se a build/ antiga foi configurada para outro prefixo, o CMake reaproveita o
 # valor salvo no cache; passar o -D de novo sempre sobrescreve.
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX" \
@@ -172,17 +196,21 @@ cmake --build "$BUILD_DIR" -j"$(nproc)"
 step "Instalando em $PREFIX"
 was_running=0
 stop_running && was_running=1
+if remove_legacy; then
+    was_running=1
+    ok "Versão antiga (TrackpMenu) removida. Configuração e atalho são migrados ao abrir."
+fi
 $SUDO cmake --install "$BUILD_DIR"
-ok "TrackpMenu instalado: $PREFIX/bin/trackpmenu"
+ok "KTrackMenu instalado: $PREFIX/bin/ktrackmenu"
 
 # O app usa um script dentro do KWin; ele é recriado ao iniciar, então apagar
 # a cópia antiga garante que a versão nova seja carregada.
-rm -f "$HOME/.local/share/trackpmenu/"*.js 2>/dev/null || true
+rm -f "$HOME/.local/share/ktrackmenu/"*.js 2>/dev/null || true
 
 if [[ $was_running -eq 1 ]]; then
     # setsid + redirecionamentos: o programa continua rodando depois que o script termina.
-    setsid -f "$PREFIX/bin/trackpmenu" --daemon >/dev/null 2>&1 </dev/null
-    ok "TrackpMenu reiniciado com a versão nova."
+    setsid -f "$PREFIX/bin/ktrackmenu" --daemon >/dev/null 2>&1 </dev/null
+    ok "KTrackMenu reiniciado com a versão nova."
 fi
 
 # ~/.local/bin fora do PATH só atrapalha quem quer usar o comando no terminal
@@ -194,7 +222,7 @@ fi
 cat <<EOF
 
 ${BOLD}Próximos passos:${RESET}
-  1. Abra "TrackpMenu" no menu de aplicativos (ou rode: $PREFIX/bin/trackpmenu).
+  1. Abra "KTrackMenu" no menu de aplicativos (ou rode: $PREFIX/bin/ktrackmenu).
   2. Na aba Comportamento, escolha o atalho (ex.: Meta+Z) e marque "Iniciar com a sessão".
-  3. Já tem um menu de outro computador? Copie o menu.json para ~/.config/trackpmenu/.
+  3. Já tem um menu de outro computador? Copie o menu.json para ~/.config/ktrackmenu/.
 EOF

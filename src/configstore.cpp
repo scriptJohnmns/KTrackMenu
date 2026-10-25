@@ -82,10 +82,10 @@ constexpr auto defaultConfig = R"json({
 })json";
 
 // Caminho do arquivo que faz o app iniciar com a sessão:
-// ~/.config/autostart/io.github.trackpmenu.desktop
+// ~/.config/autostart/io.github.ktrackmenu.desktop
 QString autostartPath()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/autostart/io.github.trackpmenu.desktop");
+    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/autostart/io.github.ktrackmenu.desktop");
 }
 }
 
@@ -103,14 +103,40 @@ ConfigStore::ConfigStore(QObject *parent)
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] {
         watch();
     });
+    migrateFromTrackpMenu();
     reload();
     watch();
+}
+
+void ConfigStore::migrateFromTrackpMenu()
+{
+    // O app se chamava TrackpMenu até outubro de 2026. Na primeira vez que o
+    // KTrackMenu abre, ele copia a configuração antiga (menu.json, stats.ini…)
+    // de ~/.config/trackpmenu para ~/.config/ktrackmenu. A pasta antiga fica
+    // intacta, como cópia de segurança.
+    const QString config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    const QDir oldDir(config + QStringLiteral("/trackpmenu"));
+    const QString newDir = config + QStringLiteral("/ktrackmenu");
+    if (oldDir.exists() && !QFileInfo::exists(newDir)) {
+        QDir().mkpath(newDir);
+        const QStringList files = oldDir.entryList(QDir::Files);
+        for (const QString &name : files)
+            QFile::copy(oldDir.filePath(name), newDir + QLatin1Char('/') + name);
+    }
+
+    // "Iniciar com a sessão": troca o arquivo antigo (que abria o executável
+    // antigo) por um novo, apontando para o KTrackMenu.
+    const QString oldAutostart = config + QStringLiteral("/autostart/io.github.trackpmenu.desktop");
+    if (QFile::exists(oldAutostart)) {
+        QFile::remove(oldAutostart);
+        setAutostart(true);
+    }
 }
 
 QString ConfigStore::filePath() const
 {
     // GenericConfigLocation normalmente é ~/.config
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/trackpmenu/menu.json");
+    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/ktrackmenu/menu.json");
 }
 
 QVariantMap ConfigStore::defaults() const
@@ -152,7 +178,7 @@ void ConfigStore::reload()
         return;
     }
     if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "trackpmenu: cannot read" << file.fileName();
+        qWarning() << "ktrackmenu: cannot read" << file.fileName();
         return;
     }
 
@@ -161,7 +187,7 @@ void ConfigStore::reload()
     if (error.error != QJsonParseError::NoError || !doc.isObject()) {
         // JSON inválido (ex.: alguém salvou o arquivo no meio de uma edição):
         // mantém o menu anterior, em vez de apagar tudo.
-        qWarning() << "trackpmenu: invalid JSON in" << file.fileName() << error.errorString();
+        qWarning() << "ktrackmenu: invalid JSON in" << file.fileName() << error.errorString();
         // Se ainda não havia menu nenhum carregado, usa o padrão.
         if (m_config.isEmpty()) {
             m_config = normalized(defaults());
@@ -181,14 +207,14 @@ void ConfigStore::reload()
 bool ConfigStore::save(const QVariantMap &config)
 {
     const QVariantMap clean = normalized(config);
-    // Cria a pasta ~/.config/trackpmenu se ela não existir.
+    // Cria a pasta ~/.config/ktrackmenu se ela não existir.
     QDir().mkpath(QFileInfo(filePath()).absolutePath());
 
     // QSaveFile escreve num arquivo temporário e só substitui o original no
     // commit(). Se faltar energia no meio, o menu.json antigo continua inteiro.
     QSaveFile file(filePath());
     if (!file.open(QIODevice::WriteOnly)) {
-        qWarning() << "trackpmenu: cannot write" << file.fileName();
+        qWarning() << "ktrackmenu: cannot write" << file.fileName();
         return false;
     }
     // Indented = JSON formatado com quebras de linha, fácil de ler e editar à mão.
@@ -237,7 +263,7 @@ void ConfigStore::setAutostart(bool enabled)
         // iniciar só em segundo plano, sem abrir janela.
         file.write(QStringLiteral("[Desktop Entry]\n"
                                   "Type=Application\n"
-                                  "Name=TrackpMenu\n"
+                                  "Name=KTrackMenu\n"
                                   "Exec=%1 --daemon\n"
                                   "Icon=input-mouse\n"
                                   "NoDisplay=true\n"

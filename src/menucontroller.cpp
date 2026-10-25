@@ -21,7 +21,10 @@
 #include <QDir>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QLocale>
 #include <QProcess>
+#include <QSettings>
+#include <QStandardPaths>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickWindow>
@@ -52,6 +55,25 @@ constexpr int executeDelayMs = 120;
 // Máximo de janelas no submenu "Janelas abertas": mais que isso fica difícil de mirar.
 constexpr int maxWindows = 12;
 
+// Marcos do contador de aberturas e o nome da "conquista" de cada um.
+struct Achievement {
+    int count;
+    const char *title;
+};
+constexpr Achievement achievements[] = {
+    {100, "Aprendiz do TrackPoint"},
+    {1000, "Mestre do TrackPoint"},
+    {10000, "Lenda do TrackPoint"},
+};
+
+// O contador fica num arquivo separado (~/.config/ktrackmenu/stats.ini), para
+// não regravar o menu.json a cada abertura.
+QSettings statsFile()
+{
+    return QSettings(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/ktrackmenu/stats.ini"),
+                     QSettings::IniFormat);
+}
+
 // Atalho para ler um campo de texto de um item, já sem espaços nas pontas.
 // Ex.: str(item, "type") devolve "app", "command"...
 QString str(const QVariantMap &item, const char *key)
@@ -67,11 +89,12 @@ MenuController::MenuController(ConfigStore *config, ToggleStates *toggles, Windo
     , m_windows(windows)
     , m_media(media)
     , m_action(new QAction(this))
+    , m_openCount(statsFile().value(QStringLiteral("openCount"), 0).toInt())
 {
     // O KDE identifica o atalho pelo objectName da ação. O texto aparece em
     // Configurações do sistema → Atalhos.
     m_action->setObjectName(QStringLiteral("show-menu"));
-    m_action->setText(QStringLiteral("Mostrar o menu do TrackpMenu"));
+    m_action->setText(QStringLiteral("Mostrar o menu do KTrackMenu"));
     // Registra o atalho global no KDE. Se o usuário já tinha escolhido outro
     // atalho antes, o KDE mantém a escolha dele (é o comportamento "autoloading").
     KGlobalAccel::self()->setDefaultShortcut(m_action, defaultShortcuts);
@@ -80,6 +103,18 @@ MenuController::MenuController(ConfigStore *config, ToggleStates *toggles, Windo
     // atalho ganha também a tecla de estrela. NoAutoloading = força a troca.
     if (KGlobalAccel::self()->shortcut(m_action) == QList<QKeySequence>{defaultShortcuts.first()})
         KGlobalAccel::self()->setShortcut(m_action, defaultShortcuts, KGlobalAccel::NoAutoloading);
+    // O app se chamava TrackpMenu, e o KDE guardou o atalho com esse nome
+    // ("trackpmenu"). Se ainda existir, apaga o registro antigo (liberando as
+    // teclas) e passa o mesmo atalho para o KTrackMenu. Como o registro antigo
+    // some, isto só acontece uma vez.
+    const QList<QKeySequence> oldShortcut = KGlobalAccel::self()->globalShortcut(QStringLiteral("trackpmenu"), QStringLiteral("show-menu"));
+    if (!oldShortcut.isEmpty()) {
+        auto msg = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/kglobalaccel"),
+                                                  QStringLiteral("org.kde.KGlobalAccel"), QStringLiteral("unregister"));
+        msg << QStringLiteral("trackpmenu") << QStringLiteral("show-menu");
+        QDBusConnection::sessionBus().call(msg);
+        KGlobalAccel::self()->setShortcut(m_action, oldShortcut, KGlobalAccel::NoAutoloading);
+    }
     // Quando o atalho é apertado, a ação é "disparada" e chamamos toggle().
     connect(m_action, &QAction::triggered, this, &MenuController::toggle);
     // Se o atalho for trocado (por aqui ou nas Configurações do sistema),
@@ -128,13 +163,13 @@ QQuickWindow *MenuController::ensureOverlay()
     if (m_overlay || !m_engine)
         return m_overlay;
 
-    // Cria a janela a partir do arquivo qml/Overlay.qml do módulo "TrackpMenu".
-    QQmlComponent component(m_engine, "TrackpMenu", "Overlay");
+    // Cria a janela a partir do arquivo qml/Overlay.qml do módulo "KTrackMenu".
+    QQmlComponent component(m_engine, "KTrackMenu", "Overlay");
     QObject *object = component.create();
     // qobject_cast converte com segurança: devolve nulo se não for uma janela.
     m_overlay = qobject_cast<QQuickWindow *>(object);
     if (!m_overlay) {
-        qWarning() << "trackpmenu: cannot create overlay" << component.errors();
+        qWarning() << "ktrackmenu: cannot create overlay" << component.errors();
         delete object;
         return nullptr;
     }
@@ -156,7 +191,7 @@ QQuickWindow *MenuController::ensureOverlay()
         layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityExclusive);
         // Com vários monitores, abre no monitor em uso.
         layer->setWantsToBeOnActiveScreen(true);
-        layer->setScope(QStringLiteral("trackpmenu"));
+        layer->setScope(QStringLiteral("ktrackmenu"));
     } else {
         // Sessão X11: uma janela sem bordas, sempre no topo e fora da barra de tarefas.
         m_overlay->setFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
@@ -174,12 +209,34 @@ void MenuController::show()
         return;
     // Avisa o QML para voltar ao menu principal e esperar a posição do cursor.
     Q_EMIT showRequested();
+    countOpen();
     if (QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
         overlay->show(); // o layer-shell já faz a janela ocupar a tela toda
     else
         overlay->showFullScreen();
     // Pede o foco do teclado para a janela.
     overlay->requestActivate();
+}
+
+void MenuController::countOpen()
+{
+    QSettings stats = statsFile();
+    m_openCount = stats.value(QStringLiteral("openCount"), 0).toInt() + 1;
+    stats.setValue(QStringLiteral("openCount"), m_openCount);
+    Q_EMIT openCountChanged();
+
+    for (const Achievement &a : achievements) {
+        if (a.count != m_openCount)
+            continue;
+        // Notificação do KDE, pelo padrão freedesktop (org.freedesktop.Notifications).
+        // Argumentos do Notify: app, id a substituir (0 = nova), ícone, título,
+        // texto, botões, dicas extras e tempo na tela (-1 = padrão do sistema).
+        auto msg = QDBusMessage::createMethodCall(QStringLiteral("org.freedesktop.Notifications"), QStringLiteral("/org/freedesktop/Notifications"),
+                                                  QStringLiteral("org.freedesktop.Notifications"), QStringLiteral("Notify"));
+        msg << QStringLiteral("KTrackMenu") << 0u << QStringLiteral("games-achievements") << QStringLiteral("🏆 %1").arg(QString::fromUtf8(a.title))
+            << QStringLiteral("Você já abriu o menu %1 vezes!").arg(QLocale().toString(m_openCount)) << QStringList{} << QVariantMap{} << -1;
+        QDBusConnection::sessionBus().send(msg);
+    }
 }
 
 void MenuController::hide()
@@ -192,11 +249,11 @@ void MenuController::openSettings()
 {
     // Cria a janela de configurações só na primeira vez; depois reaproveita.
     if (!m_settings && m_engine) {
-        QQmlComponent component(m_engine, "TrackpMenu", "Settings");
+        QQmlComponent component(m_engine, "KTrackMenu", "Settings");
         QObject *object = component.create();
         m_settings = qobject_cast<QQuickWindow *>(object);
         if (!m_settings) {
-            qWarning() << "trackpmenu: cannot create settings window" << component.errors();
+            qWarning() << "ktrackmenu: cannot create settings window" << component.errors();
             delete object;
             return;
         }
@@ -320,7 +377,7 @@ void MenuController::execute(const QVariantMap &item)
         // Procura o aplicativo pelo nome do arquivo .desktop (ex.: "org.kde.konsole.desktop").
         const KService::Ptr service = KService::serviceByStorageId(str(item, "app"));
         if (!service) {
-            qWarning() << "trackpmenu: application not found:" << str(item, "app");
+            qWarning() << "ktrackmenu: application not found:" << str(item, "app");
             return;
         }
         // Abre o app do jeito do KDE (com ícone de "carregando", ativação etc.).
@@ -364,6 +421,6 @@ void MenuController::execute(const QVariantMap &item)
         // Play/Pause, Próxima ou Anterior no player que está tocando (ver mediaplayers.cpp).
         m_media->action(str(item, "action"));
     } else {
-        qWarning() << "trackpmenu: unknown item type" << type;
+        qWarning() << "ktrackmenu: unknown item type" << type;
     }
 }

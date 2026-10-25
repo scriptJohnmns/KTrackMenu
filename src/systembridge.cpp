@@ -102,7 +102,7 @@ void SystemBridge::openSystemShortcuts() const
 QVariantMap SystemBridge::aboutInfo() const
 {
     return {
-        {QStringLiteral("version"), QStringLiteral(TRACKPMENU_VERSION)},              // versão do app (CMakeLists.txt)
+        {QStringLiteral("version"), QStringLiteral(KTRACKMENU_VERSION)},              // versão do app (CMakeLists.txt)
         {QStringLiteral("qt"), QString::fromLatin1(qVersion())},                      // versão do Qt em uso
         {QStringLiteral("frameworks"), QStringLiteral(KGLOBALACCEL_VERSION_STRING)},  // versão do KDE Frameworks
         {QStringLiteral("system"), QSysInfo::prettyProductName()},                    // ex.: "Fedora Linux 43"

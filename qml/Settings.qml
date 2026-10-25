@@ -5,7 +5,8 @@
 //   Itens do menu → lista de itens à esquerda + editor (ItemEditor.qml) à direita.
 //                   No topo, escolhe-se qual menu editar: o geral ou o de um app.
 //   Comportamento → atalho de ativação, "segurar e soltar", início automático
-//   Aparência     → tamanho, formato, cores, transparência, desfoque e animação
+//   Aparência     → prévia ao vivo + estilos prontos, tamanho, formato, cores,
+//                   transparência, desfoque e animação (componentes no fim do arquivo)
 //   Sobre         → criador, versão, dicas de uso e informações do sistema
 //
 // Como a edição funciona: ao abrir a janela, a configuração é COPIADA para
@@ -16,6 +17,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Dialogs as Dialogs
+import QtQuick.Effects
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kquickcontrols as KQuickControls
@@ -61,7 +63,7 @@ Kirigami.ApplicationWindow {
     }
 
     // Nome legível de cada tipo, mostrado embaixo do nome do item na lista.
-    readonly property var typeNames: ({ app: "Aplicativo", command: "Comando", shortcut: "Atalho do KDE", url: "Abrir URL/arquivo", toggle: "Liga/desliga", windows: "Janelas abertas", menu: "Submenu" })
+    readonly property var typeNames: ({ app: "Aplicativo", command: "Comando", shortcut: "Atalho do KDE", url: "Abrir URL/arquivo", toggle: "Liga/desliga", windows: "Janelas abertas", media: "Controle de mídia", menu: "Submenu" })
 
     // Segue o caminho "p" dentro do rascunho e devolve a lista de itens daquele nível.
     // O caminho começa nos itens do menu escolhido em "menuIndex".
@@ -256,7 +258,7 @@ Kirigami.ApplicationWindow {
     }
 
     pageStack.initialPage: Kirigami.Page {
-        title: "TrackpMenu"
+        title: "KTrackMenu"
         padding: 0
 
         header: QQC2.TabBar {
@@ -502,7 +504,7 @@ Kirigami.ApplicationWindow {
                     // Vale na hora (cria/apaga um arquivo em ~/.config/autostart).
                     QQC2.Switch {
                         Kirigami.FormData.label: "Iniciar com a sessão:"
-                        text: "Abrir o TrackpMenu ao entrar no KDE"
+                        text: "Abrir o KTrackMenu ao entrar no KDE"
                         checked: Config.autostart
                         onToggled: Config.autostart = checked
                     }
@@ -535,15 +537,19 @@ Kirigami.ApplicationWindow {
             }
 
             // ---- Aba "Aparência" ----
-            // Tudo aqui vai para o rascunho: precisa de "Salvar" para valer.
-            QQC2.ScrollView {
+            // À esquerda, uma prévia ao vivo do anel; à direita, as opções em
+            // cartões. Tudo aqui vai para o rascunho: precisa de "Salvar" para valer.
+            RowLayout {
                 id: appearancePage
-                contentWidth: availableWidth
+                spacing: 0
+
+                // Cópia das opções de aparência do rascunho. É uma cópia NOVA a
+                // cada edição (por causa do "revision"), para a prévia perceber a mudança.
+                readonly property var values: { win.revision; return Object.assign({}, win.draft.appearance || {}) }
 
                 // Atalhos para ler e gravar uma opção de aparência do rascunho.
                 function get(key, fallback) {
-                    win.revision
-                    const v = win.draft.appearance ? win.draft.appearance[key] : undefined
+                    const v = values[key]
                     return v === undefined ? fallback : v
                 }
                 function set(key, value) {
@@ -551,159 +557,291 @@ Kirigami.ApplicationWindow {
                     win.draft.appearance[key] = value
                     win.changed()
                 }
-
-                Kirigami.FormLayout {
-                    width: parent.width
-
-                    Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Tamanho" }
-
-                    QQC2.SpinBox {
-                        Kirigami.FormData.label: "Raio do anel (px):"
-                        from: 70; to: 320; stepSize: 10
-                        value: appearancePage.get("radius", 120)
-                        onValueModified: appearancePage.set("radius", value)
+                // Aplica várias opções de uma vez (usado pelos estilos prontos).
+                function apply(options) {
+                    if (!win.draft.appearance) win.draft.appearance = {}
+                    Object.assign(win.draft.appearance, options)
+                    win.changed()
+                }
+                // Estilo pronto: "Padrão" troca tudo pelos valores originais; os
+                // outros só mudam as opções que eles listam.
+                function applyPreset(preset) {
+                    if (preset.name === "Padrão") {
+                        win.draft.appearance = JSON.parse(JSON.stringify(preset.options))
+                        win.changed()
+                    } else {
+                        apply(preset.options)
                     }
+                }
+                // Cor de destaque escolhida ("" = a do tema).
+                readonly property string customAccent: get("accentColor", "")
 
-                    QQC2.SpinBox {
-                        Kirigami.FormData.label: "Tamanho dos itens (px):"
-                        from: 40; to: 128; stepSize: 4
-                        value: appearancePage.get("itemSize", 64)
-                        onValueModified: appearancePage.set("itemSize", value)
-                    }
+                // Estilos prontos. "Padrão" volta tudo ao original; os outros só
+                // mudam as opções listadas (a cor escolhida, por exemplo, fica).
+                readonly property var presets: [
+                    { name: "Padrão", options: Config.defaults().appearance },
+                    { name: "Compacto", options: { radius: 90, itemSize: 48, showNumbers: false } },
+                    { name: "Vidro", options: { ringOpacity: 55, blur: "ring", dimOpacity: 8, showBorder: true } },
+                    { name: "Minimalista", options: { showBorder: false, showNumbers: false, dimOpacity: 0, ringOpacity: 85, blur: "none" } },
+                    { name: "Grande", options: { radius: 170, itemSize: 84 } }
+                ]
 
-                    Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Itens" }
+                // Paleta de cores de destaque (as cores do tema Breeze e algumas vizinhas).
+                readonly property var palette: ["#3daee9", "#1abc9c", "#27ae60", "#fdbc4b", "#f67400", "#da4453", "#e91e63", "#8e44ad"]
 
-                    QQC2.ComboBox {
-                        Kirigami.FormData.label: "Formato:"
-                        textRole: "text"
-                        valueRole: "value"
-                        model: [
-                            { value: "circle", text: "Círculo" },
-                            { value: "rounded", text: "Cantos arredondados" },
-                            { value: "square", text: "Quadrado" }
-                        ]
-                        currentIndex: Math.max(0, indexOfValue(appearancePage.get("itemShape", "circle")))
-                        onActivated: appearancePage.set("itemShape", currentValue)
-                    }
+                // ---- Coluna da esquerda: prévia ----
+                ColumnLayout {
+                    Layout.preferredWidth: Math.min(Kirigami.Units.gridUnit * 20, appearancePage.width * 0.42)
+                    Layout.fillHeight: true
+                    Layout.margins: Kirigami.Units.largeSpacing
+                    spacing: Kirigami.Units.smallSpacing
 
-                    // Cor do item selecionado. Vazio = cor de destaque do tema do KDE.
-                    RowLayout {
-                        Kirigami.FormData.label: "Cor de destaque:"
-                        readonly property string custom: appearancePage.get("accentColor", "")
-                        // Quadradinho com a cor atual.
-                        Rectangle {
-                            Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                            Layout.preferredHeight: Layout.preferredWidth
-                            radius: 4
-                            color: parent.custom || Kirigami.Theme.highlightColor
-                            border.color: Kirigami.Theme.textColor
-                            border.width: 1
-                        }
-                        QQC2.Button {
-                            text: "Escolher…"
-                            icon.name: "color-picker"
-                            onClicked: {
-                                colorDialog.selectedColor = parent.custom || Kirigami.Theme.highlightColor
-                                colorDialog.open()
-                            }
-                        }
-                        QQC2.Button {
-                            text: "Usar a do tema"
-                            icon.name: "edit-reset"
-                            enabled: parent.custom !== ""
-                            onClicked: appearancePage.set("accentColor", "")
-                        }
-                        // Janela de escolha de cor do sistema.
-                        Dialogs.ColorDialog {
-                            id: colorDialog
-                            // toString() de uma cor dá "#rrggbb", que é o que vai no menu.json.
-                            onAccepted: appearancePage.set("accentColor", selectedColor.toString())
+                    RingPreview {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        appearance: appearancePage.values
+                        // Cantos arredondados na prévia: o layer + MultiEffect
+                        // recorta o conteúdo no formato de um retângulo arredondado.
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: previewMask
                         }
                     }
-
-                    QQC2.Switch {
-                        Kirigami.FormData.label: "Números:"
-                        text: "Mostrar os números 1–9 (as teclas funcionam mesmo escondidos)"
-                        checked: appearancePage.get("showNumbers", true)
-                        onToggled: appearancePage.set("showNumbers", checked)
+                    // Máscara dos cantos arredondados da prévia (invisível).
+                    Rectangle {
+                        id: previewMask
+                        visible: false
+                        layer.enabled: true
+                        width: parent.width
+                        height: parent.height
+                        radius: Kirigami.Units.cornerRadius * 2
                     }
-
-                    QQC2.Switch {
-                        Kirigami.FormData.label: "Contornos:"
-                        text: "Mostrar a borda do anel e dos itens"
-                        checked: appearancePage.get("showBorder", true)
-                        onToggled: appearancePage.set("showBorder", checked)
-                    }
-
-                    Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Transparência e fundo" }
-
-                    // Controle deslizante com o valor em % ao lado.
-                    RowLayout {
-                        Kirigami.FormData.label: "Opacidade do anel:"
-                        QQC2.Slider {
-                            id: ringOpacitySlider
-                            from: 0; to: 100; stepSize: 1
-                            value: appearancePage.get("ringOpacity", 92)
-                            // onMoved só dispara quando o USUÁRIO arrasta.
-                            onMoved: appearancePage.set("ringOpacity", value)
-                        }
-                        QQC2.Label { text: Math.round(ringOpacitySlider.value) + "%" }
-                    }
-
-                    RowLayout {
-                        Kirigami.FormData.label: "Escurecer a tela:"
-                        QQC2.Slider {
-                            id: dimSlider
-                            from: 0; to: 80; stepSize: 1
-                            value: appearancePage.get("dimOpacity", 18)
-                            onMoved: appearancePage.set("dimOpacity", value)
-                        }
-                        QQC2.Label { text: Math.round(dimSlider.value) + "%" }
-                    }
-
-                    QQC2.ComboBox {
-                        Kirigami.FormData.label: "Desfoque (blur):"
-                        textRole: "text"
-                        valueRole: "value"
-                        model: [
-                            { value: "none", text: "Nenhum" },
-                            { value: "ring", text: "Atrás do anel" },
-                            { value: "screen", text: "Tela inteira" }
-                        ]
-                        currentIndex: Math.max(0, indexOfValue(appearancePage.get("blur", "none")))
-                        onActivated: appearancePage.set("blur", currentValue)
-                    }
-
                     QQC2.Label {
                         Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.Wrap
                         opacity: 0.7
-                        text: "O desfoque aparece melhor com a opacidade do anel abaixo de 80%. Ele depende do efeito \"Desfoque\" estar ativo nos efeitos da área de trabalho do KDE."
+                        font: Kirigami.Theme.smallFont
+                        text: "Prévia ao vivo: passe o mouse nos itens. O tamanho é reduzido para caber aqui."
                     }
+                }
 
-                    Item { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Animação" }
+                Kirigami.Separator { Layout.fillHeight: true }
 
-                    QQC2.ComboBox {
-                        Kirigami.FormData.label: "Animações:"
-                        textRole: "text"
-                        valueRole: "value"
-                        model: [
-                            { value: "normal", text: "Normais" },
-                            { value: "fast", text: "Rápidas" },
-                            { value: "off", text: "Desligadas" }
-                        ]
-                        currentIndex: Math.max(0, indexOfValue(appearancePage.get("animation", "normal")))
-                        onActivated: appearancePage.set("animation", currentValue)
-                    }
+                // ---- Coluna da direita: opções ----
+                QQC2.ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    contentWidth: availableWidth
 
-                    // Só a seção "appearance" volta ao padrão; os itens ficam como estão.
-                    QQC2.Button {
-                        text: "Restaurar aparência padrão"
-                        icon.name: "edit-reset"
-                        onClicked: {
-                            win.draft.appearance = JSON.parse(JSON.stringify(Config.defaults().appearance))
-                            win.changed()
+                    ColumnLayout {
+                        width: parent.width
+                        spacing: Kirigami.Units.largeSpacing
+
+                        // Espaço no topo (o ScrollView não tem margem própria).
+                        Item { implicitHeight: Kirigami.Units.smallSpacing }
+
+                        // ---- Estilos prontos ----
+                        Card {
+                            title: "Estilos prontos"
+                            subtitle: "Um ponto de partida. Depois, ajuste o que quiser abaixo."
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+                                Repeater {
+                                    model: appearancePage.presets
+                                    delegate: Choice {
+                                        required property var modelData
+                                        width: Kirigami.Units.gridUnit * 5.5
+                                        text: modelData.name
+                                        onClicked: appearancePage.applyPreset(modelData)
+                                        // Miniatura: a aparência atual com o estilo aplicado por cima.
+                                        RingPreview {
+                                            anchors.fill: parent
+                                            interactive: false
+                                            showWallpaper: false
+                                            appearance: Object.assign({}, appearancePage.values, modelData.options, { blur: "none", dimOpacity: 0 })
+                                        }
+                                    }
+                                }
+                            }
                         }
+
+                        // ---- Tamanho ----
+                        Card {
+                            title: "Tamanho"
+
+                            Option {
+                                label: "Raio do anel"
+                                ValueSlider {
+                                    from: 70; to: 320; stepSize: 10; unit: " px"
+                                    value: appearancePage.get("radius", 120)
+                                    onMoved: appearancePage.set("radius", value)
+                                }
+                            }
+                            Option {
+                                label: "Tamanho dos itens"
+                                ValueSlider {
+                                    from: 40; to: 128; stepSize: 4; unit: " px"
+                                    value: appearancePage.get("itemSize", 64)
+                                    onMoved: appearancePage.set("itemSize", value)
+                                }
+                            }
+                        }
+
+                        // ---- Itens: formato, cor, números e contornos ----
+                        Card {
+                            title: "Itens"
+
+                            Option {
+                                label: "Formato"
+                                Repeater {
+                                    model: [
+                                        { value: "circle", text: "Círculo", r: 0.5 },
+                                        { value: "rounded", text: "Arredondado", r: 0.25 },
+                                        { value: "square", text: "Quadrado", r: 0.08 }
+                                    ]
+                                    delegate: Choice {
+                                        id: shapeChoice
+                                        required property var modelData
+                                        width: Kirigami.Units.gridUnit * 4.5
+                                        text: modelData.text
+                                        checked: appearancePage.get("itemShape", "circle") === modelData.value
+                                        onClicked: appearancePage.set("itemShape", modelData.value)
+                                        // Desenho do formato.
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: Kirigami.Units.iconSizes.medium
+                                            height: width
+                                            radius: width * shapeChoice.modelData.r
+                                            color: shapeChoice.checked ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
+                                        }
+                                    }
+                                }
+                            }
+
+                            Option {
+                                label: "Cor de destaque"
+                                hint: "Cor do item selecionado."
+                                // "Tema": usa a cor de destaque do KDE.
+                                Swatch {
+                                    color: Kirigami.Theme.highlightColor
+                                    checked: appearancePage.customAccent === ""
+                                    tip: "Cor do tema do KDE"
+                                    onClicked: appearancePage.set("accentColor", "")
+                                }
+                                Repeater {
+                                    model: appearancePage.palette
+                                    delegate: Swatch {
+                                        required property string modelData
+                                        color: modelData
+                                        checked: appearancePage.customAccent.toLowerCase() === modelData
+                                        onClicked: appearancePage.set("accentColor", modelData)
+                                    }
+                                }
+                                // Outra cor qualquer, pelo seletor de cores do sistema.
+                                Swatch {
+                                    readonly property string custom: appearancePage.customAccent
+                                    readonly property bool other: custom !== "" && !appearancePage.palette.includes(custom.toLowerCase())
+                                    color: other ? custom : "transparent"
+                                    checked: other
+                                    tip: "Outra cor…"
+                                    onClicked: {
+                                        colorDialog.selectedColor = custom || Kirigami.Theme.highlightColor
+                                        colorDialog.open()
+                                    }
+                                    Kirigami.Icon {
+                                        visible: !parent.other
+                                        anchors.centerIn: parent
+                                        width: Kirigami.Units.iconSizes.small
+                                        height: width
+                                        source: "color-picker"
+                                    }
+                                }
+                                // Janela de escolha de cor do sistema.
+                                Dialogs.ColorDialog {
+                                    id: colorDialog
+                                    // toString() de uma cor dá "#rrggbb", que é o que vai no menu.json.
+                                    onAccepted: appearancePage.set("accentColor", selectedColor.toString())
+                                }
+                            }
+
+                            Option {
+                                label: "Números 1–9"
+                                hint: "As teclas funcionam mesmo com os números escondidos."
+                                QQC2.Switch {
+                                    // "Binding on" (e não "checked:") continua valendo depois
+                                    // de um clique: assim um estilo pronto também mexe no botão.
+                                    Binding on checked { value: appearancePage.get("showNumbers", true) }
+                                    onToggled: appearancePage.set("showNumbers", checked)
+                                }
+                            }
+                            Option {
+                                label: "Contornos"
+                                hint: "Borda fina no anel e nos itens."
+                                QQC2.Switch {
+                                    Binding on checked { value: appearancePage.get("showBorder", true) }
+                                    onToggled: appearancePage.set("showBorder", checked)
+                                }
+                            }
+                        }
+
+                        // ---- Fundo: opacidade, escurecimento e desfoque ----
+                        Card {
+                            title: "Fundo"
+
+                            Option {
+                                label: "Opacidade do anel"
+                                ValueSlider {
+                                    from: 0; to: 100; stepSize: 1; unit: "%"
+                                    value: appearancePage.get("ringOpacity", 92)
+                                    onMoved: appearancePage.set("ringOpacity", value)
+                                }
+                            }
+                            Option {
+                                label: "Escurecer a tela"
+                                ValueSlider {
+                                    from: 0; to: 80; stepSize: 1; unit: "%"
+                                    value: appearancePage.get("dimOpacity", 18)
+                                    onMoved: appearancePage.set("dimOpacity", value)
+                                }
+                            }
+                            Option {
+                                label: "Desfoque"
+                                hint: "Aparece melhor com a opacidade abaixo de 80%. Precisa do efeito \"Desfoque\" ativo nos efeitos do KDE."
+                                Segmented {
+                                    model: [
+                                        { value: "none", text: "Nenhum" },
+                                        { value: "ring", text: "Atrás do anel" },
+                                        { value: "screen", text: "Tela inteira" }
+                                    ]
+                                    current: appearancePage.get("blur", "none")
+                                    onPicked: value => appearancePage.set("blur", value)
+                                }
+                            }
+                        }
+
+                        // ---- Animação ----
+                        Card {
+                            title: "Animação"
+
+                            Option {
+                                label: "Velocidade"
+                                Segmented {
+                                    model: [
+                                        { value: "normal", text: "Normal" },
+                                        { value: "fast", text: "Rápida" },
+                                        { value: "off", text: "Desligada" }
+                                    ]
+                                    current: appearancePage.get("animation", "normal")
+                                    onPicked: value => appearancePage.set("animation", value)
+                                }
+                            }
+                        }
+
+                        Item { implicitHeight: Kirigami.Units.smallSpacing }
                     }
                 }
             }
@@ -716,7 +854,7 @@ Kirigami.ApplicationWindow {
                 // Dados do sistema vindos do C++ (SystemBridge::aboutInfo).
                 readonly property var info: System.aboutInfo()
                 // Texto copiado pelo botão "Copiar informações" (útil para relatar bugs).
-                readonly property string report: "TrackpMenu " + info.version
+                readonly property string report: "KTrackMenu " + info.version
                     + "\nSistema: " + info.system + " (kernel " + info.kernel + ", sessão " + info.session + ")"
                     + "\nQt " + info.qt + ", KDE Frameworks " + info.frameworks
                     + "\nAtalho: " + (Controller.activationShortcut.toString() || "nenhum")
@@ -738,7 +876,7 @@ Kirigami.ApplicationWindow {
                             Layout.preferredHeight: Kirigami.Units.iconSizes.enormous
                         }
                         Kirigami.Heading {
-                            text: "TrackpMenu"
+                            text: "KTrackMenu"
                             level: 1
                             Layout.alignment: Qt.AlignHCenter
                         }
@@ -784,6 +922,8 @@ Kirigami.ApplicationWindow {
                         QQC2.Label { Kirigami.FormData.label: "Kernel:"; text: aboutPage.info.kernel }
                         QQC2.Label { Kirigami.FormData.label: "Sessão:"; text: aboutPage.info.session }
                         QQC2.Label { Kirigami.FormData.label: "Qt / Frameworks:"; text: aboutPage.info.qt + " / " + aboutPage.info.frameworks }
+                        // Contador de aberturas (é ele que libera as "conquistas").
+                        QQC2.Label { Kirigami.FormData.label: "Menus abertos:"; text: Controller.openCount.toLocaleString(Qt.locale(), "f", 0) }
 
                         RowLayout {
                             QQC2.Button {
@@ -811,6 +951,201 @@ Kirigami.ApplicationWindow {
                         // campos de texto.
                         TextEdit { id: copyHelper; visible: false }
                     }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Componentes da aba Aparência
+    // "component Nome: Tipo { ... }" cria um tipo novo, usado só neste arquivo.
+    // "default property alias content: x.data" faz os filhos escritos dentro do
+    // componente irem parar dentro de "x".
+    // =========================================================================
+
+    // Cartão: caixa com título (e subtítulo opcional) que agrupa opções.
+    component Card: Rectangle {
+        property string title
+        property string subtitle
+        default property alias content: body.data
+
+        Layout.fillWidth: true
+        Layout.leftMargin: Kirigami.Units.largeSpacing
+        Layout.rightMargin: Kirigami.Units.largeSpacing
+        implicitHeight: column.implicitHeight + 2 * Kirigami.Units.largeSpacing
+        radius: Kirigami.Units.cornerRadius * 2
+        // Cores de "área de conteúdo" do tema, um pouco diferentes do fundo da janela.
+        Kirigami.Theme.colorSet: Kirigami.Theme.View
+        Kirigami.Theme.inherit: false
+        color: Kirigami.Theme.backgroundColor
+        border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.12)
+
+        ColumnLayout {
+            id: column
+            anchors.fill: parent
+            anchors.margins: Kirigami.Units.largeSpacing
+            spacing: Kirigami.Units.largeSpacing
+
+            ColumnLayout {
+                spacing: 0
+                Kirigami.Heading { level: 4; text: title }
+                QQC2.Label {
+                    visible: subtitle !== ""
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    opacity: 0.7
+                    text: subtitle
+                }
+            }
+            ColumnLayout {
+                id: body
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.largeSpacing
+            }
+        }
+    }
+
+    // Linha de opção: nome (e explicação curta) à esquerda, controle à direita.
+    // A coluna da esquerda tem largura fixa, então os controles ficam alinhados.
+    component Option: RowLayout {
+        property string label
+        property string hint
+        default property alias content: control.data
+
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.largeSpacing
+
+        ColumnLayout {
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 9
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 9
+            Layout.alignment: Qt.AlignTop
+            spacing: 0
+            QQC2.Label { Layout.fillWidth: true; text: label; wrapMode: Text.Wrap }
+            QQC2.Label {
+                visible: hint !== ""
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                opacity: 0.6
+                font: Kirigami.Theme.smallFont
+                text: hint
+            }
+        }
+        // Flow quebra a linha se os controles não couberem (ex.: as bolinhas de cor).
+        Flow {
+            id: control
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+        }
+    }
+
+    // Controle deslizante com o valor escrito ao lado (ex.: "120 px").
+    // "moved(value)" avisa quando o USUÁRIO arrasta.
+    component ValueSlider: RowLayout {
+        id: valueSlider
+        property real from: 0
+        property real to: 100
+        property real stepSize: 1
+        property real value: 0
+        property string unit: ""
+        signal moved(real value)
+
+        width: parent ? parent.width : implicitWidth
+        QQC2.Slider {
+            id: slider
+            Layout.fillWidth: true
+            from: valueSlider.from
+            to: valueSlider.to
+            stepSize: valueSlider.stepSize
+            // Binding (e não "value:") continua valendo depois de o usuário
+            // arrastar; "when" evita brigar com o dedo enquanto arrasta.
+            Binding on value { value: valueSlider.value; when: !slider.pressed }
+            onMoved: valueSlider.moved(value)
+        }
+        QQC2.Label {
+            Layout.minimumWidth: Kirigami.Units.gridUnit * 3
+            horizontalAlignment: Text.AlignRight
+            text: Math.round(slider.value) + valueSlider.unit
+            font.features: { "tnum": 1 }   // algarismos de largura igual: o texto não "pula"
+        }
+    }
+
+    // Bloco clicável com um desenho em cima e um nome embaixo (estilos e formatos).
+    // O desenho vai dentro do bloco, como filho.
+    component Choice: QQC2.AbstractButton {
+        id: choice
+        default property alias content: drawing.data
+        implicitHeight: Kirigami.Units.gridUnit * 5
+        hoverEnabled: true
+
+        background: Rectangle {
+            radius: Kirigami.Units.cornerRadius * 2
+            color: choice.checked ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.15)
+                 : choice.hovered ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.06)
+                 : "transparent"
+            border.width: choice.checked ? 2 : 1
+            border.color: choice.checked || choice.hovered ? Kirigami.Theme.highlightColor
+                        : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+        }
+        contentItem: ColumnLayout {
+            spacing: 2
+            Item {
+                id: drawing
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+            }
+            QQC2.Label {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: choice.text
+                font: Kirigami.Theme.smallFont
+            }
+        }
+        padding: Kirigami.Units.smallSpacing
+    }
+
+    // Bolinha de cor clicável. Selecionada, ganha um anel em volta.
+    component Swatch: QQC2.AbstractButton {
+        id: swatch
+        property color color
+        property string tip
+        implicitWidth: Kirigami.Units.iconSizes.medium
+        implicitHeight: implicitWidth
+        hoverEnabled: true
+        QQC2.ToolTip.text: tip || color.toString()
+        QQC2.ToolTip.visible: hovered
+        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+
+        background: Rectangle {
+            radius: width / 2
+            color: swatch.color
+            // Anel de seleção (cor do texto) ou contorno fino.
+            border.width: swatch.checked ? 3 : 1
+            border.color: swatch.checked ? Kirigami.Theme.textColor
+                        : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, swatch.hovered ? 0.6 : 0.2)
+        }
+    }
+
+    // Botões lado a lado em que só um fica marcado (como abas pequenas).
+    // model: [{ value, text }, ...]; "current" diz qual está marcado.
+    component Segmented: Row {
+        id: segmented
+        property var model: []
+        property string current
+        signal picked(string value)
+        spacing: 0
+        Repeater {
+            model: segmented.model
+            delegate: QQC2.Button {
+                required property var modelData
+                text: modelData.text
+                checkable: true
+                checked: segmented.current === modelData.value
+                onClicked: {
+                    segmented.picked(modelData.value)
+                    // O clique inverte "checked" sozinho e desfaz o binding acima.
+                    // Qt.binding recoloca a regra: marcado = é o valor atual.
+                    checked = Qt.binding(() => segmented.current === modelData.value)
                 }
             }
         }

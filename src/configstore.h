@@ -12,7 +12,7 @@
 #include <QObject>
 #include <QVariantMap>
 
-// Lê e grava ~/.config/trackpmenu/menu.json e recarrega o menu quando o arquivo
+// Lê e grava ~/.config/ktrackmenu/menu.json e recarrega o menu quando o arquivo
 // muda no disco. Assim, outras ferramentas (scripts, um editor de texto, um
 // servidor MCP) também podem editar o menu.
 //
@@ -60,6 +60,8 @@ Q_SIGNALS:
     void autostartChanged();
 
 private:
+    // Copia a configuração do nome antigo do app (TrackpMenu), se houver.
+    void migrateFromTrackpMenu();
     // Completa campos que faltam com os valores padrão.
     QVariantMap normalized(QVariantMap config) const;
     // (Re)começa a vigiar o arquivo e a pasta por mudanças.

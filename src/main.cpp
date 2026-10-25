@@ -6,7 +6,7 @@
 // objetos para as telas em QML e coloca o ícone na bandeja do sistema.
 //
 // Visão geral dos arquivos:
-//   configstore    → lê e grava o menu em ~/.config/trackpmenu/menu.json
+//   configstore    → lê e grava o menu em ~/.config/ktrackmenu/menu.json
 //   menucontroller → atalho global, janela do menu radial e execução das ações
 //   systembridge   → consultas ao sistema (apps instalados, atalhos do KDE…)
 //   windowtracker  → janelas abertas e app em foco (via um script dentro do KWin)
@@ -37,7 +37,7 @@ namespace
 // O que o usuário pediu ao iniciar o programa.
 enum class Mode { Settings, Daemon, Toggle, Quit };
 
-// Converte os argumentos (ex.: "trackpmenu --toggle") em um Mode.
+// Converte os argumentos (ex.: "ktrackmenu --toggle") em um Mode.
 // Também cuida sozinho de --help e --version (imprime e encerra).
 Mode parseMode(const QStringList &arguments)
 {
@@ -68,11 +68,11 @@ int main(int argc, char *argv[])
     // É QApplication, e não QGuiApplication, porque o seletor de ícones do KDE
     // é uma janela do tipo QWidget, e sem isso o programa travava (segfault).
     QApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("trackpmenu"));
-    app.setApplicationDisplayName(QStringLiteral("TrackpMenu"));
+    app.setApplicationName(QStringLiteral("ktrackmenu"));
+    app.setApplicationDisplayName(QStringLiteral("KTrackMenu"));
     app.setOrganizationDomain(QStringLiteral("github.io"));
-    app.setApplicationVersion(QStringLiteral(TRACKPMENU_VERSION)); // vem do CMakeLists.txt
-    app.setDesktopFileName(QStringLiteral("io.github.trackpmenu"));
+    app.setApplicationVersion(QStringLiteral(KTRACKMENU_VERSION)); // vem do CMakeLists.txt
+    app.setDesktopFileName(QStringLiteral("io.github.ktrackmenu"));
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("input-mouse")));
     // Por padrão o Qt encerra o app quando a última janela fecha. Aqui não:
     // o programa continua em segundo plano esperando o atalho.
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     trayMenu.addAction(QIcon::fromTheme(QStringLiteral("application-exit")), QStringLiteral("Sair"), &app, &QCoreApplication::quit);
 
     QSystemTrayIcon tray(app.windowIcon());
-    tray.setToolTip(QStringLiteral("TrackpMenu"));
+    tray.setToolTip(QStringLiteral("KTrackMenu"));
     tray.setContextMenu(&trayMenu);
     // connect(emissor, sinal, contexto, função): "quando o ícone for ativado,
     // rode esta função". Trigger = clique esquerdo, que abre as configurações.
@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
         }
     };
 
-    // Quando uma segunda cópia do app é aberta (ex.: "trackpmenu --toggle"), ela
+    // Quando uma segunda cópia do app é aberta (ex.: "ktrackmenu --toggle"), ela
     // manda seus argumentos para esta cópia por D-Bus, e eles chegam aqui.
     QObject::connect(&service, &KDBusService::activateRequested, &app, [&](const QStringList &arguments, const QString &) {
         handle(parseMode(arguments));

@@ -29,6 +29,8 @@ class MenuController : public QObject
     Q_PROPERTY(bool visible READ isVisible NOTIFY visibleChanged)
     // O atalho atual, mostrado na aba Geral e na aba Sobre.
     Q_PROPERTY(QKeySequence activationShortcut READ activationShortcut NOTIFY activationShortcutChanged)
+    // Quantas vezes o menu já foi aberto (mostrado na aba Sobre).
+    Q_PROPERTY(int openCount READ openCount NOTIFY openCountChanged)
 
 public:
     explicit MenuController(ConfigStore *config, ToggleStates *toggles, WindowTracker *windows, MediaPlayers *media, QObject *parent = nullptr);
@@ -79,12 +81,21 @@ Q_SIGNALS:
     void showRequested();
     void visibleChanged();
     void activationShortcutChanged();
+    void openCountChanged();
 
 private:
     // Cria a janela do menu na primeira vez que for usada e a devolve.
     QQuickWindow *ensureOverlay();
     // Faz de fato o que o item pede.
     void execute(const QVariantMap &item);
+    // Soma 1 no contador de aberturas e, nos marcos, mostra uma "conquista".
+    void countOpen();
+
+public:
+    int openCount() const { return m_openCount; }
+
+private:
+    int m_openCount = 0;
 
     ConfigStore *m_config;
     ToggleStates *m_toggles;

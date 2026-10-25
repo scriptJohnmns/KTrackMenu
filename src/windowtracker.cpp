@@ -24,7 +24,7 @@
 namespace
 {
 // Nome com que o script fica registrado dentro do KWin.
-const QString scriptName = QStringLiteral("trackpmenu-windows");
+const QString scriptName = QStringLiteral("ktrackmenu-windows");
 
 // Endereço do serviço de scripts do KWin no D-Bus.
 const QString kwinService = QStringLiteral("org.kde.KWin");
@@ -37,12 +37,12 @@ const QString scriptingInterface = QStringLiteral("org.kde.kwin.Scripting");
 //  - workspace.stackingOrder é a lista de janelas, da mais atrás para a mais na frente
 //  - callDBus(serviço, caminho, interface, função, argumentos...) chama o nosso C++
 constexpr auto kwinScript = R"js(
-// Endereço do TrackpMenu no D-Bus.
-var service = "io.github.trackpmenu", path = "/Windows", iface = "io.github.trackpmenu.Windows";
+// Endereço do KTrackMenu no D-Bus.
+var service = "io.github.ktrackmenu", path = "/Windows", iface = "io.github.ktrackmenu.Windows";
 
-// O menu aberto se chama "trackpmenu"; a janela de configurações, "io.github.trackpmenu".
+// O menu aberto se chama "ktrackmenu"; a janela de configurações, "io.github.ktrackmenu".
 function isOurs(w) {
-    return w.resourceClass === "trackpmenu" || w.resourceClass === "io.github.trackpmenu";
+    return w.resourceClass === "ktrackmenu" || w.resourceClass === "io.github.ktrackmenu";
 }
 
 // Avisa qual app está em foco.
@@ -104,7 +104,7 @@ WindowTracker::WindowTracker(QObject *parent)
     : QObject(parent)
 {
     // Publica este objeto no D-Bus em /Windows, dentro do serviço
-    // io.github.trackpmenu (registrado pelo KDBusService no main.cpp).
+    // io.github.ktrackmenu (registrado pelo KDBusService no main.cpp).
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/Windows"), this, QDBusConnection::ExportScriptableSlots);
     loadKWinScript();
 }
@@ -118,17 +118,20 @@ WindowTracker::~WindowTracker()
 void WindowTracker::loadKWinScript()
 {
     // O KWin carrega scripts a partir de um arquivo. Gravamos o texto acima em
-    // ~/.local/share/trackpmenu/windows.js
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/trackpmenu");
+    // ~/.local/share/ktrackmenu/windows.js
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/ktrackmenu");
     const QString file = dir + QStringLiteral("/windows.js");
-    // A versão anterior usava outro nome de arquivo e de script: limpa as sobras.
-    QFile::remove(dir + QStringLiteral("/activewindow.js"));
-    QDBusConnection::sessionBus().call(QDBusMessage::createMethodCall(kwinService, scriptingPath, scriptingInterface, QStringLiteral("unloadScript"))
-                                       << QStringLiteral("trackpmenu-activewindow"));
+    // Versões anteriores usavam outros nomes de script (e o app se chamava
+    // TrackpMenu, com a pasta ~/.local/share/trackpmenu): limpa as sobras.
+    for (const char *old : {"trackpmenu-activewindow", "trackpmenu-windows"}) {
+        QDBusConnection::sessionBus().call(QDBusMessage::createMethodCall(kwinService, scriptingPath, scriptingInterface, QStringLiteral("unloadScript"))
+                                           << QString::fromLatin1(old));
+    }
+    QDir(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/trackpmenu")).removeRecursively();
     QDir().mkpath(QFileInfo(file).absolutePath());
     QSaveFile out(file);
     if (!out.open(QIODevice::WriteOnly) || out.write(kwinScript) < 0 || !out.commit()) {
-        qWarning() << "trackpmenu: cannot write" << file;
+        qWarning() << "ktrackmenu: cannot write" << file;
         return;
     }
 
@@ -140,7 +143,7 @@ void WindowTracker::loadKWinScript()
     // D-Bus /Scripting/Script<id>, que tem a função run() para iniciá-lo.
     const QDBusReply<int> id = bus.call(QDBusMessage::createMethodCall(kwinService, scriptingPath, scriptingInterface, QStringLiteral("loadScript")) << file << scriptName);
     if (!id.isValid() || id.value() < 0) {
-        qWarning() << "trackpmenu: KWin did not load the active-window script" << id.error().message();
+        qWarning() << "ktrackmenu: KWin did not load the active-window script" << id.error().message();
         return;
     }
     bus.call(QDBusMessage::createMethodCall(kwinService, QStringLiteral("/Scripting/Script%1").arg(id.value()), QStringLiteral("org.kde.kwin.Script"), QStringLiteral("run")));

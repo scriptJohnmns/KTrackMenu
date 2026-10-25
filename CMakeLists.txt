@@ -1,5 +1,5 @@
 # =============================================================================
-# CMakeLists.txt — "receita" de compilação do TrackpMenu
+# CMakeLists.txt — "receita" de compilação do KTrackMenu
 #
 # O CMake lê este arquivo e gera os Makefiles que de fato compilam o programa.
 # Uso típico (ver README.md):
@@ -13,7 +13,7 @@ cmake_minimum_required(VERSION 3.22)
 
 # Nome e versão do projeto. A versão vira a variável ${PROJECT_VERSION},
 # que é repassada ao código C++ mais abaixo (aparece na aba "Sobre").
-project(trackpmenu VERSION 0.1.0 LANGUAGES CXX)
+project(ktrackmenu VERSION 0.1.0 LANGUAGES CXX)
 
 # Usa C++20 e falha se o compilador não suportar.
 set(CMAKE_CXX_STANDARD 20)
@@ -42,7 +42,7 @@ qt_standard_project_setup(REQUIRES 6.6)
 qt_policy(SET QTP0004 NEW)
 
 # O executável e os arquivos C++ que o compõem.
-qt_add_executable(trackpmenu
+qt_add_executable(ktrackmenu
     src/main.cpp
     src/windowtracker.cpp
     src/windowtracker.h
@@ -59,21 +59,22 @@ qt_add_executable(trackpmenu
 )
 
 # As telas em QML ficam embutidas dentro do executável, num "módulo" chamado
-# TrackpMenu. Depois o C++ cria as janelas pelo nome (ex.: "Overlay", "Settings").
-qt_add_qml_module(trackpmenu
-    URI TrackpMenu
+# KTrackMenu. Depois o C++ cria as janelas pelo nome (ex.: "Overlay", "Settings").
+qt_add_qml_module(ktrackmenu
+    URI KTrackMenu
     VERSION 1.0
     QML_FILES
         qml/Overlay.qml
         qml/Settings.qml
         qml/ItemEditor.qml
+        qml/RingPreview.qml
 )
 
-# Cria a macro TRACKPMENU_VERSION no C++ com o valor da versão do projeto.
-target_compile_definitions(trackpmenu PRIVATE TRACKPMENU_VERSION="${PROJECT_VERSION}")
+# Cria a macro KTRACKMENU_VERSION no C++ com o valor da versão do projeto.
+target_compile_definitions(ktrackmenu PRIVATE KTRACKMENU_VERSION="${PROJECT_VERSION}")
 
 # Liga ("linka") o executável às bibliotecas encontradas acima.
-target_link_libraries(trackpmenu PRIVATE
+target_link_libraries(ktrackmenu PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Qml
@@ -92,8 +93,8 @@ target_link_libraries(trackpmenu PRIVATE
 
 # O que o "cmake --install" copia: o executável para bin/ e o arquivo .desktop
 # para share/applications/ (é ele que faz o app aparecer no menu do KDE).
-install(TARGETS trackpmenu ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(TARGETS ktrackmenu ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 # O .desktop é gerado com o caminho completo do executável no Exec=, para o
 # atalho do menu de apps funcionar mesmo se ~/.local/bin não estiver no PATH.
-configure_file(data/io.github.trackpmenu.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/io.github.trackpmenu.desktop @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/io.github.trackpmenu.desktop DESTINATION ${KDE_INSTALL_APPDIR})
+configure_file(data/io.github.ktrackmenu.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/io.github.ktrackmenu.desktop @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/io.github.ktrackmenu.desktop DESTINATION ${KDE_INSTALL_APPDIR})

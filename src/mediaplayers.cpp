@@ -45,7 +45,7 @@ MediaPlayers::MediaPlayers(QObject *parent)
     // Avisa quando um player abre ou fecha. O próprio D-Bus manda o sinal
     // NameOwnerChanged para todo serviço que aparece ou some; filtramos os
     // players em onNameOwnerChanged. (O QDBusServiceWatcher com "*" não
-    // percebia players abertos depois do TrackpMenu, como o Spotify.)
+    // percebia players abertos depois do KTrackMenu, como o Spotify.)
     bus.connect(QStringLiteral("org.freedesktop.DBus"), QStringLiteral("/org/freedesktop/DBus"), QStringLiteral("org.freedesktop.DBus"),
                 QStringLiteral("NameOwnerChanged"), this, SLOT(onNameOwnerChanged(QString, QString, QString)));
 
@@ -54,7 +54,7 @@ MediaPlayers::MediaPlayers(QObject *parent)
     bus.connect(QString(), objectPath, propertiesInterface, QStringLiteral("PropertiesChanged"),
                 this, SLOT(onPropertiesChanged(QDBusMessage)));
 
-    // Players que já estavam abertos antes do TrackpMenu começar.
+    // Players que já estavam abertos antes do KTrackMenu começar.
     const QStringList names = bus.interface()->registeredServiceNames().value();
     for (const QString &name : names) {
         if (name.startsWith(servicePrefix))

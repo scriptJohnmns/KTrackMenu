@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=TrackpMenu
+Name=KTrackMenu
 GenericName=Quick menu for the TrackPoint
 GenericName[pt_BR]=Menu rápido do TrackPoint
 Comment=Radial quick menu for KDE Plasma, made for the TrackPoint
 Comment[pt_BR]=Menu radial de atalhos para o KDE Plasma, feito para o TrackPoint
-Exec=@KDE_INSTALL_FULL_BINDIR@/trackpmenu
+Exec=@KDE_INSTALL_FULL_BINDIR@/ktrackmenu
 Icon=input-mouse
 Categories=Qt;KDE;Utility;
-Keywords=trackpoint;thinkpad;menu;shortcut;atalho;
+Keywords=ktrackmenu;trackpoint;thinkpad;menu;shortcut;atalho;
 X-KDE-Shortcuts=

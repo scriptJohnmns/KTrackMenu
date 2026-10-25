@@ -1,4 +1,4 @@
-# TrackpMenu
+# KTrackMenu
 
 Menu radial de atalhos para o **KDE Plasma 6**, pensado para o TrackPoint dos ThinkPads
 (mas funciona com qualquer mouse ou touchpad).
@@ -27,26 +27,26 @@ em volta do cursor, então a mão não precisa sair do teclado e a memória musc
 - **Janelas abertas:** um submenu montado na hora para pular para qualquer janela.
 - **Manter aberto:** itens como Play/Pause e Mudo não fecham o menu, para você apertar vários em sequência.
 - **Aparência configurável:** tamanho, formato dos itens, cor de destaque, opacidade, desfoque e animações.
-- Tudo fica num único arquivo, `~/.config/trackpmenu/menu.json`, fácil de copiar para outro computador.
+- Tudo fica num único arquivo, `~/.config/ktrackmenu/menu.json`, fácil de copiar para outro computador.
 
 ## Requisitos
 
 - **KDE Plasma 6**, de preferência no Wayland. Existe um modo X11, mas ele não foi testado.
 - Linux com Qt 6.6 ou mais novo e KDE Frameworks 6.
 
-O TrackpMenu depende de partes do KDE (atalhos globais, scripts do KWin, layer-shell), então
+O KTrackMenu depende de partes do KDE (atalhos globais, scripts do KWin, layer-shell), então
 **não funciona no GNOME, em outros ambientes, nem no Windows ou macOS**.
 
 ## Instalação
 
 ```sh
-git clone https://github.com/scriptJohnmns/trackpmenu.git
-cd trackpmenu
+git clone https://github.com/scriptJohnmns/ktrackmenu.git
+cd ktrackmenu
 ./install.sh
 ```
 
 O `install.sh` descobre a sua distro, instala o que é preciso para compilar (pede a senha do
-`sudo` só nessa hora), compila e instala em `~/.local`. Se o TrackpMenu já estiver rodando, ele é
+`sudo` só nessa hora), compila e instala em `~/.local`. Se o KTrackMenu já estiver rodando, ele é
 reiniciado com a versão nova.
 
 | Comando                    | O que faz                                                  |
@@ -61,22 +61,29 @@ Distros reconhecidas: **Fedora** (dnf), **Arch, CachyOS, Manjaro, EndeavourOS** 
 **openSUSE** (zypper) e **Debian, Ubuntu, Kubuntu, KDE neon** (apt). Até agora só o Fedora foi
 testado. Se faltar algum pacote na sua distro, abra uma issue.
 
+### Vindo do TrackpMenu?
+
+O projeto se chamava **TrackpMenu**. Rodar o `./install.sh` remove a versão antiga, e na primeira
+vez que o KTrackMenu abre ele copia sozinho o seu menu (`~/.config/trackpmenu` →
+`~/.config/ktrackmenu`), o atalho de teclado e o "Iniciar com a sessão". A pasta antiga fica
+intacta, como cópia de segurança.
+
 ### Atualizar
 
 ```sh
-cd trackpmenu
+cd ktrackmenu
 git pull
 ./install.sh --no-deps
 ```
 
 ### Primeiro uso
 
-1. Abra **TrackpMenu** no menu de aplicativos. A janela de configurações aparece e o programa fica
+1. Abra **KTrackMenu** no menu de aplicativos. A janela de configurações aparece e o programa fica
    rodando em segundo plano, com um ícone na bandeja.
 2. Na aba **Comportamento**:
    - escolha o **atalho**. O padrão é a tecla ★ (`Fn+F12` nos ThinkPads), mas um atalho com
      modificador, como `Meta+Z`, permite usar o "segurar e soltar";
-   - marque **Iniciar com a sessão**, para o TrackpMenu abrir sozinho ao entrar no KDE.
+   - marque **Iniciar com a sessão**, para o KTrackMenu abrir sozinho ao entrar no KDE.
 3. Aperte o atalho e teste.
 
 ### Compilar à mão
@@ -94,7 +101,7 @@ cmake --install build
 
 | Ação                        | Como fazer                                                                    |
 |-----------------------------|-------------------------------------------------------------------------------|
-| Abrir o menu                | o atalho escolhido (ou `trackpmenu --toggle`)                                 |
+| Abrir o menu                | o atalho escolhido (ou `ktrackmenu --toggle`)                                 |
 | Apontar um item             | mova o cursor na direção dele, ou gire a roda do mouse, ou use as setas/Tab  |
 | Executar                    | clique esquerdo, `Enter`/`Espaço`, ou a tecla `1`–`9` do item                 |
 | Segurar e soltar            | segure o atalho, aponte e **solte**: o item apontado é executado              |
@@ -236,7 +243,7 @@ Até 6 itens no anel interno ainda ficam fáceis de mirar. Passando disso, prefi
 
 ## Configurações
 
-A janela de configurações abre pelo menu de aplicativos, pelo ícone da bandeja ou com `trackpmenu`.
+A janela de configurações abre pelo menu de aplicativos, pelo ícone da bandeja ou com `ktrackmenu`.
 
 - **Itens do menu:** cria, edita, reordena e remove itens. Use **Testar menu** para ver o resultado
   (o teste usa a versão salva).
@@ -261,13 +268,13 @@ A janela de configurações abre pelo menu de aplicativos, pelo ícone da bandej
 
 ## O arquivo `menu.json`
 
-Tudo fica em `~/.config/trackpmenu/menu.json`. Você pode editá-lo à mão: o TrackpMenu percebe a
+Tudo fica em `~/.config/ktrackmenu/menu.json`. Você pode editá-lo à mão: o KTrackMenu percebe a
 mudança e recarrega na hora, sem reiniciar.
 
 **Levar o menu para outro computador:** copie o arquivo.
 
 ```sh
-scp ~/.config/trackpmenu/menu.json outro-pc:~/.config/trackpmenu/
+scp ~/.config/ktrackmenu/menu.json outro-pc:~/.config/ktrackmenu/
 ```
 
 Exemplo completo, pequeno:
@@ -297,32 +304,32 @@ Opções que faltarem no arquivo usam o valor padrão.
 ## Linha de comando
 
 ```sh
-trackpmenu            # abre as configurações (e deixa o serviço rodando)
-trackpmenu --daemon   # só inicia o serviço, sem janela (é o que o "Iniciar com a sessão" usa)
-trackpmenu --toggle   # mostra ou esconde o menu (útil para ligar a outro atalho ou script)
-trackpmenu --quit     # encerra o serviço
+ktrackmenu            # abre as configurações (e deixa o serviço rodando)
+ktrackmenu --daemon   # só inicia o serviço, sem janela (é o que o "Iniciar com a sessão" usa)
+ktrackmenu --toggle   # mostra ou esconde o menu (útil para ligar a outro atalho ou script)
+ktrackmenu --quit     # encerra o serviço
 ```
 
-Só uma cópia roda por vez: chamar `trackpmenu` de novo conversa com a que já está aberta.
+Só uma cópia roda por vez: chamar `ktrackmenu` de novo conversa com a que já está aberta.
 
 ## Solução de problemas
 
-- **O atalho não abre o menu.** Veja se o TrackpMenu está rodando (ícone na bandeja ou
-  `pgrep trackpmenu`). Confira o atalho em *Configurações do sistema → Teclado → Atalhos →
-  TrackpMenu*: outro programa pode estar usando a mesma tecla.
+- **O atalho não abre o menu.** Veja se o KTrackMenu está rodando (ícone na bandeja ou
+  `pgrep ktrackmenu`). Confira o atalho em *Configurações do sistema → Teclado → Atalhos →
+  KTrackMenu*: outro programa pode estar usando a mesma tecla.
 - **Segurar e soltar não funciona.** O atalho precisa ter `Meta`, `Ctrl`, `Alt` ou `Shift`.
   Teclas como `Fn+F12` mandam "apertou" e "soltou" juntos, então não dá para segurar.
 - **O desfoque não aparece.** Ative o efeito *Desfoque* em *Configurações do sistema →
   Gerenciamento de janelas → Efeitos da área de trabalho*. O efeito aparece melhor com a
   opacidade do anel abaixo de 80%.
 - **Os menus por aplicativo ou as janelas abertas não aparecem.** Eles dependem de um pequeno
-  script que o TrackpMenu carrega no KWin (`~/.local/share/trackpmenu/windows.js`). Reiniciar o
-  TrackpMenu carrega o script de novo.
+  script que o KTrackMenu carrega no KWin (`~/.local/share/ktrackmenu/windows.js`). Reiniciar o
+  KTrackMenu carrega o script de novo.
 - **O player não aparece no controle de mídia.** O player precisa suportar MPRIS (Spotify,
   Firefox, Chrome/Brave, VLC, Elisa e a maioria dos outros suportam). Para ver os players que o
   sistema enxerga: `busctl --user list | grep mpris`.
 - **Algo deu errado e o menu ficou estranho.** *Comportamento → Restaurar tudo para o padrão*, ou
-  apague `~/.config/trackpmenu/menu.json` (faça uma cópia antes).
+  apague `~/.config/ktrackmenu/menu.json` (faça uma cópia antes).
 
 ## Como funciona
 

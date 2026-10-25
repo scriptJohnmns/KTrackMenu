@@ -110,7 +110,7 @@ void ToggleStates::toggle(const QString &id)
     // Lê o estado atual antes de inverter, para não usar um valor velho.
     refresh();
     if (!m_states.contains(id)) {
-        qWarning() << "trackpmenu: toggle not available:" << id;
+        qWarning() << "ktrackmenu: toggle not available:" << id;
         return;
     }
     const bool turnOn = !m_states.value(id).toBool();
