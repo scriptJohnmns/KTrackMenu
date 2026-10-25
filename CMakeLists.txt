@@ -54,6 +54,8 @@ qt_add_executable(trackpmenu
     src/systembridge.h
     src/togglestates.cpp
     src/togglestates.h
+    src/mediaplayers.cpp
+    src/mediaplayers.h
 )
 
 # As telas em QML ficam embutidas dentro do executável, num "módulo" chamado

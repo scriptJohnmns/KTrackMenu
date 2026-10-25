@@ -61,10 +61,10 @@ constexpr auto defaultConfig = R"json({
     { "label": "Visão geral", "icon": "view-app-grid", "type": "shortcut", "component": "/component/kwin", "shortcut": "Overview" },
     { "label": "Captura", "icon": "spectacle", "type": "command", "command": "spectacle -r" },
     { "label": "Mídia", "icon": "applications-multimedia", "type": "menu", "items": [
-      { "label": "Play/Pause", "icon": "media-playback-start", "type": "shortcut", "component": "/component/mediacontrol", "shortcut": "playpausemedia" },
-      { "label": "Próxima", "icon": "media-skip-forward", "type": "shortcut", "component": "/component/mediacontrol", "shortcut": "nextmedia" },
-      { "label": "Anterior", "icon": "media-skip-backward", "type": "shortcut", "component": "/component/mediacontrol", "shortcut": "previousmedia" },
-      { "label": "Mudo", "icon": "audio-volume-muted", "type": "command", "command": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" }
+      { "label": "Play/Pause", "icon": "media-playback-start", "type": "media", "action": "playpause" },
+      { "label": "Próxima", "icon": "media-skip-forward", "type": "media", "action": "next" },
+      { "label": "Anterior", "icon": "media-skip-backward", "type": "media", "action": "previous" },
+      { "label": "Mudo", "icon": "audio-volume-muted", "type": "command", "command": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", "keepOpen": true }
     ] },
     { "label": "Ligar/desligar", "icon": "preferences-system", "type": "menu", "items": [
       { "label": "Wi-Fi", "icon": "network-wireless", "type": "toggle", "toggle": "wifi" },

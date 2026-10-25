@@ -13,6 +13,7 @@
 #include "windowtracker.h"
 #include "configstore.h"
 #include "togglestates.h"
+#include "mediaplayers.h"
 
 #include <QAction>
 #include <QDBusConnection>
@@ -59,11 +60,12 @@ QString str(const QVariantMap &item, const char *key)
 }
 }
 
-MenuController::MenuController(ConfigStore *config, ToggleStates *toggles, WindowTracker *windows, QObject *parent)
+MenuController::MenuController(ConfigStore *config, ToggleStates *toggles, WindowTracker *windows, MediaPlayers *media, QObject *parent)
     : QObject(parent)
     , m_config(config)
     , m_toggles(toggles)
     , m_windows(windows)
+    , m_media(media)
     , m_action(new QAction(this))
 {
     // O KDE identifica o atalho pelo objectName da ação. O texto aparece em
@@ -225,12 +227,31 @@ void MenuController::setBlur(const QString &mode, qreal x, qreal y, qreal diamet
 
 void MenuController::activate(const QVariantMap &item)
 {
+    // Itens "manter aberto" (ex.: Play/Pause) rodam na hora e o menu continua
+    // na tela, para o usuário apertar outro botão ou sair quando quiser.
+    if (keepsOpen(item)) {
+        execute(item);
+        return;
+    }
     hide();
     // singleShot roda a função uma única vez, depois do tempo indicado, sem
     // travar o programa enquanto espera.
     QTimer::singleShot(executeDelayMs, this, [this, item] {
         execute(item);
     });
+}
+
+bool MenuController::keepsOpen(const QVariantMap &item) const
+{
+    // Se o usuário marcou ou desmarcou a opção no editor, vale a escolha dele.
+    const QVariant flag = item.value(QStringLiteral("keepOpen"));
+    if (flag.isValid())
+        return flag.toBool();
+    // Sem escolha salva: os controles de mídia (Play/Pause, Próxima, Anterior…)
+    // ficam abertos por padrão, porque costumam ser usados em sequência.
+    const QString type = str(item, "type");
+    return type == QLatin1String("media")
+        || (type == QLatin1String("shortcut") && str(item, "component") == QLatin1String("/component/mediacontrol"));
 }
 
 QVariantMap MenuController::currentMenu() const
@@ -339,6 +360,9 @@ void MenuController::execute(const QVariantMap &item)
     } else if (type == QLatin1String("window")) {
         // Uma janela escolhida no submenu "Janelas abertas": traz ela para a frente.
         m_windows->activate(str(item, "window"));
+    } else if (type == QLatin1String("media")) {
+        // Play/Pause, Próxima ou Anterior no player que está tocando (ver mediaplayers.cpp).
+        m_media->action(str(item, "action"));
     } else {
         qWarning() << "trackpmenu: unknown item type" << type;
     }

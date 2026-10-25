@@ -17,6 +17,7 @@ class QQuickWindow;
 class WindowTracker;
 class ConfigStore;
 class ToggleStates;
+class MediaPlayers;
 
 // O "cérebro" do app. Cuida do atalho global que abre o menu, da janela
 // transparente que mostra o menu radial (Overlay.qml), da janela de
@@ -30,7 +31,7 @@ class MenuController : public QObject
     Q_PROPERTY(QKeySequence activationShortcut READ activationShortcut NOTIFY activationShortcutChanged)
 
 public:
-    explicit MenuController(ConfigStore *config, ToggleStates *toggles, WindowTracker *windows, QObject *parent = nullptr);
+    explicit MenuController(ConfigStore *config, ToggleStates *toggles, WindowTracker *windows, MediaPlayers *media, QObject *parent = nullptr);
 
     // O engine QML é necessário para criar as janelas; o main.cpp o entrega aqui.
     void setEngine(QQmlEngine *engine) { m_engine = engine; }
@@ -46,7 +47,12 @@ public:
 
     // Executa um item "folha" (app, comando, atalho, URL ou liga/desliga). Submenus não chegam
     // aqui: a navegação entre eles é feita no próprio Overlay.qml.
+    // Itens com "manter aberto" são executados sem fechar o menu.
     Q_INVOKABLE void activate(const QVariantMap &item);
+
+    // O item deixa o menu aberto depois de executar? Usa o campo "keepOpen" do
+    // item; se ele não existir, só os controles de mídia ficam abertos.
+    Q_INVOKABLE bool keepsOpen(const QVariantMap &item) const;
 
     // O que mostrar ao abrir o menu: { items, appItems, title }.
     //   items    → o menu geral (anel de fora, sempre igual)
@@ -83,6 +89,7 @@ private:
     ConfigStore *m_config;
     ToggleStates *m_toggles;
     WindowTracker *m_windows;
+    MediaPlayers *m_media;
     QQmlEngine *m_engine = nullptr;
     // A "ação" registrada no KDE como atalho global.
     QAction *m_action;

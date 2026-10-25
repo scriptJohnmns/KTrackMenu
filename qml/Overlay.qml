@@ -77,6 +77,12 @@ Window {
     readonly property real ringBoundary: (innerRingRadius + ringRadius) / 2
     // Diâmetro do disco de fundo do anel.
     readonly property real discSize: 2 * (ringRadius + itemSize * 0.75)
+    // Limite de fora: além desta distância do centro, o cursor está "fora do
+    // menu". Nada fica selecionado e um clique ali fecha o menu, em vez de
+    // executar o item que estiver naquela direção.
+    readonly property real outerRadius: discSize / 2 + itemSize * 0.5
+    // O anel atual tem controles de mídia? Então o centro mostra o que está tocando.
+    readonly property bool showsMedia: allItems.some(i => i.type === "media")
 
     // ---- Estado ----
     property var items: []          // itens do nível exibido agora (anel de fora)
@@ -179,8 +185,8 @@ Window {
         const dx = x - center.x
         const dy = y - center.y
         const dist = Math.hypot(dx, dy)
-        // Menu vazio, ou cursor ainda dentro da zona morta: nada selecionado.
-        if (totalCount === 0 || dist < innerRadius)
+        // Menu vazio, cursor ainda dentro da zona morta ou já fora do menu: nada selecionado.
+        if (totalCount === 0 || dist < innerRadius || dist > outerRadius)
             return -1
         // Qual anel? Também com uma folga (8 px) a favor do anel atual, para a
         // seleção não ficar pulando de um anel para o outro na divisa.
@@ -230,6 +236,19 @@ Window {
             return
         }
         Controller.activate(item)
+        // Se o menu continua aberto, o item dá uma "piscada" para mostrar que
+        // o clique foi recebido (ver "pressed" no RingItem).
+        if (Controller.keepsOpen(item)) {
+            pressedIndex = index
+            pressTimer.restart()
+        }
+    }
+
+    // Ícone de um item. O de Play/Pause muda conforme o player está tocando ou não.
+    function iconFor(item) {
+        if (item.type === "media" && item.action === "playpause")
+            return Media.playing ? "media-playback-pause" : "media-playback-start"
+        return item.icon || "application-x-executable"
     }
 
     // O item abre um submenu? ("menu" normal ou "windows", montado na hora)
@@ -255,6 +274,15 @@ Window {
     Connections {
         target: Controller
         function onShowRequested() { root.reset() }
+    }
+
+    // Índice do item que acabou de ser executado sem fechar o menu (-1 = nenhum).
+    // Fica marcado só por um instante, para o item encolher e voltar.
+    property int pressedIndex: -1
+    Timer {
+        id: pressTimer
+        interval: 120
+        onTriggered: root.pressedIndex = -1
     }
 
     // O anel é posicionado no primeiro movimento do cursor. Se o compositor não
@@ -289,13 +317,16 @@ Window {
             root.lastPos = Qt.point(mouse.x, mouse.y)
             root.selected = root.indexForPointer(mouse.x, mouse.y)
         }
+        // Clique fora do disco: fecha o menu.
         // Clique sem nada selecionado (cursor no centro): volta/fecha.
         // Botão esquerdo com item selecionado: executa (ou abre, se for submenu).
         // Botão direito com um submenu apontado: abre o submenu. Assim dá para
         // entrar em "Janelas" sem soltar o atalho e escolher a janela soltando.
         // Botão direito apontando um item comum não faz nada.
         onClicked: mouse => {
-            if (root.selected < 0)
+            if (Math.hypot(mouse.x - root.center.x, mouse.y - root.center.y) > root.outerRadius)
+                Controller.hide()
+            else if (root.selected < 0)
                 root.back()
             else if (mouse.button === Qt.LeftButton || root.isSubmenu(root.selectedItem))
                 root.trigger(root.selected)
@@ -421,9 +452,32 @@ Window {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: Kirigami.Units.iconSizes.smallMedium
                 height: width
-                visible: root.selected < 0
+                visible: root.selected < 0 && !nowPlaying.visible
                 source: root.stack.length ? "go-previous" : "window-close"
                 opacity: 0.6
+            }
+            // Capa do álbum (ou, sem capa, o ícone do player) quando o centro
+            // mostra o que está tocando.
+            Item {
+                id: nowPlaying
+                visible: root.selected < 0 && root.showsMedia && Media.available
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.min(Kirigami.Units.iconSizes.large, root.itemSize * 0.8)
+                height: width
+                Image {
+                    id: cover
+                    anchors.fill: parent
+                    source: Media.artUrl
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true   // carrega sem travar o menu (a capa pode vir da internet)
+                    sourceSize: Qt.size(width * 2, height * 2)
+                    visible: status === Image.Ready
+                }
+                Kirigami.Icon {
+                    anchors.fill: parent
+                    source: Media.playerIcon
+                    visible: cover.status !== Image.Ready
+                }
             }
             Text {
                 width: parent.width
@@ -437,9 +491,21 @@ Window {
                 // item selecionado → nome dele; dentro de submenu → nome do submenu;
                 // senão → nome do app (se houver anel interno) ou "TrackpMenu"
                 // (ou "Menu vazio" se não houver itens).
+                // Com controles de mídia no anel, sem seleção → nome da música.
                 text: root.selectedItem ? root.selectedItem.label
+                    : root.showsMedia ? (Media.available ? (Media.title || Media.playerName) : "Nada tocando")
                     : root.stack.length ? root.titles[root.titles.length - 1]
                     : root.totalCount ? (root.innerCount ? root.rootTitle : "TrackpMenu") : "Menu vazio"
+            }
+            // Embaixo do nome da música, o artista.
+            Text {
+                visible: nowPlaying.visible && Media.artist !== ""
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                color: root.alpha(Kirigami.Theme.textColor, 0.7)
+                text: Media.artist
             }
             // Embaixo do nome de um item liga/desliga, diz o estado atual.
             Text {
@@ -509,7 +575,9 @@ Window {
         // O selecionado fica com a cor de destaque e um pouco maior.
         color: current ? overlay.accent : Kirigami.Theme.alternateBackgroundColor
         border.color: overlay.alpha(Kirigami.Theme.textColor, current || !overlay.showBorder ? 0 : 0.12)
-        scale: current ? 1.12 : 1
+        // Executado agora (com o menu aberto) → encolhe um pouco, como um botão apertado.
+        readonly property bool pressed: firstIndex + index === overlay.pressedIndex
+        scale: pressed ? 0.9 : current ? 1.12 : 1
         Behavior on scale { NumberAnimation { duration: overlay.animDuration } }
         Behavior on color { ColorAnimation { duration: overlay.animDuration } }
 
@@ -518,10 +586,12 @@ Window {
             anchors.centerIn: parent
             width: parent.width * 0.55
             height: width
-            source: modelData.icon || "application-x-executable"
+            source: overlay.iconFor(modelData)
             selected: parent.current
-            // Item liga/desliga que está desligado fica apagadinho.
-            opacity: modelData.type === "toggle" && overlay.toggleState(modelData) !== true ? 0.45 : 1
+            // Fica apagadinho: item liga/desliga desligado, ou controle de mídia
+            // sem nenhum player aberto.
+            opacity: (modelData.type === "toggle" && overlay.toggleState(modelData) !== true)
+                     || (modelData.type === "media" && !Media.available) ? 0.45 : 1
         }
 
         // Bolinha no canto de itens liga/desliga: verde = ligado,

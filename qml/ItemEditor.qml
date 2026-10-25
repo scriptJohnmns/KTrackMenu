@@ -118,6 +118,7 @@ Kirigami.FormLayout {
             { value: "shortcut", text: "Acionar atalho do KDE" },
             { value: "url", text: "Abrir URL ou arquivo" },
             { value: "toggle", text: "Ligar/desligar (Wi-Fi, Bluetooth…)" },
+            { value: "media", text: "Controle de mídia (player)" },
             { value: "windows", text: "Janelas abertas" },
             { value: "menu", text: "Submenu" }
         ]
@@ -130,6 +131,12 @@ Kirigami.FormLayout {
             if (currentValue === "windows") {
                 if (!editor.item.label || editor.item.label === "Novo item") editor.item.label = "Janelas"
                 if (!editor.item.icon) editor.item.icon = "preferences-system-windows"
+            }
+            // Controle de mídia começa como Tocar/Pausar.
+            if (currentValue === "media" && !editor.item.action) {
+                editor.item.action = "playpause"
+                if (!editor.item.label || editor.item.label === "Novo item") editor.item.label = "Tocar/Pausar"
+                if (!editor.item.icon) editor.item.icon = "media-playback-start"
             }
             // Um submenu precisa de uma lista de itens, mesmo que vazia.
             if (currentValue === "menu" && !editor.item.items) editor.item.items = []
@@ -297,6 +304,40 @@ Kirigami.FormLayout {
         text: "No menu, uma bolinha verde no canto do item mostra que está ligado."
     }
 
+    // ---- Tipo "media": Tocar/Pausar, Próxima ou Anterior no player ----
+    QQC2.ComboBox {
+        Kirigami.FormData.label: "Ação:"
+        visible: editor.type === "media"
+        Layout.fillWidth: true
+        textRole: "text"
+        valueRole: "value"
+        model: [
+            { value: "playpause", text: "Tocar/Pausar", icon: "media-playback-start" },
+            { value: "next", text: "Próxima", icon: "media-skip-forward" },
+            { value: "previous", text: "Anterior", icon: "media-skip-backward" }
+        ]
+        currentIndex: { editor.revision; return indexOfValue(editor.field("action")) }
+        onActivated: index => {
+            const option = model[index]
+            const old = model.find(o => o.value === editor.item.action)
+            // Nome e ícone acompanham a ação, como no tipo "toggle".
+            if (!editor.item.label || editor.item.label === "Novo item" || (old && editor.item.label === old.text))
+                editor.item.label = option.text
+            if (!editor.item.icon || (old && editor.item.icon === old.icon))
+                editor.item.icon = option.icon
+            editor.item.action = option.value
+            editor.edited()
+        }
+    }
+
+    QQC2.Label {
+        visible: editor.type === "media"
+        Layout.fillWidth: true
+        wrapMode: Text.Wrap
+        opacity: 0.7
+        text: "Controla o player que está tocando (Spotify, Firefox, VLC…). No menu, o centro do anel mostra a música atual."
+    }
+
     // ---- Tipo "windows": submenu automático com as janelas abertas ----
     QQC2.Label {
         visible: editor.type === "windows"
@@ -304,6 +345,18 @@ Kirigami.FormLayout {
         wrapMode: Text.Wrap
         opacity: 0.7
         text: "Abre um submenu com as janelas abertas (até 12, da mais recente para a mais antiga). Escolher uma traz ela para a frente."
+    }
+
+    // ---- Vale para todos os itens que executam algo (não para submenus) ----
+    // Marcado: depois de executar, o menu continua aberto (bom para Play/Pause,
+    // volume etc.). Desmarcado: o menu fecha, como de costume.
+    QQC2.CheckBox {
+        Kirigami.FormData.label: "Depois de executar:"
+        visible: editor.type !== "" && editor.type !== "menu" && editor.type !== "windows"
+        text: "Manter o menu aberto"
+        // Controller.keepsOpen já considera o padrão (mídia fica aberta).
+        checked: { editor.revision; return editor.item ? Controller.keepsOpen(editor.item) : false }
+        onToggled: editor.set("keepOpen", checked)
     }
 
     // ---- Tipo "menu": submenu ----

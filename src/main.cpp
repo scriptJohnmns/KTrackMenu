@@ -29,6 +29,7 @@
 #include "menucontroller.h"
 #include "systembridge.h"
 #include "togglestates.h"
+#include "mediaplayers.h"
 
 // Um "namespace" sem nome deixa o que está dentro visível só neste arquivo.
 namespace
@@ -96,15 +97,17 @@ int main(int argc, char *argv[])
     SystemBridge system;
     ToggleStates toggles;
     WindowTracker windows;     // janelas abertas e app em foco (via KWin)
-    MenuController controller(&config, &toggles, &windows);
+    MediaPlayers media;        // players de mídia abertos (via MPRIS)
+    MenuController controller(&config, &toggles, &windows, &media);
 
     // O "engine" é quem carrega e executa os arquivos QML.
     // setContextProperty publica um objeto C++ para o QML com um nome: no QML,
-    // "Config", "System", "Toggles" e "Controller" passam a ser esses objetos.
+    // "Config", "System", "Toggles", "Media" e "Controller" passam a ser esses objetos.
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("Config"), &config);
     engine.rootContext()->setContextProperty(QStringLiteral("System"), &system);
     engine.rootContext()->setContextProperty(QStringLiteral("Toggles"), &toggles);
+    engine.rootContext()->setContextProperty(QStringLiteral("Media"), &media);
     engine.rootContext()->setContextProperty(QStringLiteral("Controller"), &controller);
     controller.setEngine(&engine);
 
